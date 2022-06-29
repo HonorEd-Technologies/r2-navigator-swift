@@ -477,14 +477,6 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
         }()
         
         paginationView.reloadAtIndex(initialIndex, location: PageLocation(locator), pageCount: spreads.count, readingProgression: readingProgression) {
-            if let minChapter = self.config.trimmedToc?.first, let index = self.spreads.firstIndex(withHref: minChapter.href) {
-                self.paginationView.minPageNumber = index
-            }
-            
-            if let maxChapter = self.config.trimmedToc?.last, let index = self.spreads.firstIndex(withHref: maxChapter.href) {
-                self.paginationView.maxPageNumber = index
-            }
-            
             self.on(.loaded)
         }
     }
