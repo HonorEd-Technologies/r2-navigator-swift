@@ -274,7 +274,10 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
         view.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(didTapBackground)))
 
         editingActions.updateSharedMenuController()
+<<<<<<< HEAD
         
+=======
+>>>>>>> da9bb34 (init commit)
         reloadSpreads(at: initialLocation)
     }
     
@@ -475,6 +478,14 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
         }
         
         paginationView.reloadAtIndex(initialIndex, location: PageLocation(locator), pageCount: spreads.count, readingProgression: readingProgression) {
+            if let minChapter = self.config.trimmedToc?.first, let index = self.spreads.firstIndex(withHref: minChapter.href) {
+                self.paginationView.minPageNumber = index
+            }
+            
+            if let maxChapter = self.config.trimmedToc?.last, let index = self.spreads.firstIndex(withHref: maxChapter.href) {
+                self.paginationView.maxPageNumber = index
+            }
+            
             self.on(.loaded)
         }
     }
@@ -876,12 +887,16 @@ extension EPUBNavigatorViewController: PaginationViewDelegate {
     
     func paginationView(_ paginationView: PaginationView, pageViewAtIndex index: Int) -> (UIView & PageView)? {
         let spread = spreads[index]
+<<<<<<< HEAD
         if let trimmedToc = config.trimmedToc, !trimmedToc.isEmpty {
             let pageNumbers = trimmedToc.map(\.href).map(trimEpubHrefComments).compactMap({ self.spreads.firstIndex(withHref: $0) })
             paginationView.pageNumbers = pageNumbers
         }
         
         if let trimmedToc = config.trimmedToc, trimmedToc.map(\.href).map(trimEpubHrefComments).map({ spread.contains(href: $0) }).filter({ $0 }).isEmpty {
+=======
+        if let trimmedToc = config.trimmedToc, trimmedToc.map({ spread.contains(href: $0.href) }).filter({ $0 }).isEmpty {
+>>>>>>> da9bb34 (init commit)
             return nil
         }
         let spreadViewType = (spread.layout == .fixed) ? EPUBFixedSpreadView.self : EPUBReflowableSpreadView.self
