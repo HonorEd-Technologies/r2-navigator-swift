@@ -460,11 +460,11 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
         let locator = locator ?? currentLocation
         spreads = EPUBSpread.makeSpreads(for: publication, readingProgression: readingProgression, pageCountPerSpread: pageCountPerSpread)
         
-        if let minChapter = self.config.trimmedToc?.first, let index = self.spreads.firstIndex(withHref: minChapter.href) {
+        if let minChapter = self.config.trimmedToc?.first, let index = self.spreads.firstIndex(withHref: trimEpubHrefComments(minChapter.href)) {
             self.paginationView.minPageNumber = index
         }
         
-        if let maxChapter = self.config.trimmedToc?.last, let index = self.spreads.firstIndex(withHref: maxChapter.href) {
+        if let maxChapter = self.config.trimmedToc?.last, let index = self.spreads.firstIndex(withHref: trimEpubHrefComments(maxChapter.href)) {
             self.paginationView.maxPageNumber = index
         }
         
@@ -868,7 +868,7 @@ extension EPUBNavigatorViewController: PaginationViewDelegate {
     
     func paginationView(_ paginationView: PaginationView, pageViewAtIndex index: Int) -> (UIView & PageView)? {
         let spread = spreads[index]
-        if let trimmedToc = config.trimmedToc, trimmedToc.map({ spread.contains(href: $0.href) }).filter({ $0 }).isEmpty {
+        if let trimmedToc = config.trimmedToc, !trimmedToc.isEmpty, trimmedToc.map(\.href).map( trimEpubHrefComments).map({ spread.contains(href: $0) }).filter({ $0 }).isEmpty {
             return nil
         }
         let spreadViewType = (spread.layout == .fixed) ? EPUBFixedSpreadView.self : EPUBReflowableSpreadView.self
@@ -977,4 +977,12 @@ extension EPUBNavigatorViewController {
     @available(*, unavailable, renamed: "go(to:)")
     public func displayReadingOrderItem(with href: String) -> Int? { nil }
     
+}
+
+public func trimEpubHrefComments(_ href: String) -> String {
+    if href.contains("#") {
+        return String(href.prefix(while: { $0 != "#" }))
+    } else {
+        return href
+    }
 }
