@@ -460,21 +460,22 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
         let locator = locator ?? currentLocation
         spreads = EPUBSpread.makeSpreads(for: publication, readingProgression: readingProgression, pageCountPerSpread: pageCountPerSpread)
         
+        var initialIndex: Int
+        
+        if let href = locator?.href, let foundIndex = spreads.firstIndex(withHref: href) {
+            initialIndex = foundIndex
+        } else {
+            initialIndex = 0
+        }
+        
         if let minChapter = self.config.trimmedToc?.first, let index = self.spreads.firstIndex(withHref: trimEpubHrefComments(minChapter.href)) {
             self.paginationView.minPageNumber = index
+            initialIndex = max(index, initialIndex)
         }
         
         if let maxChapter = self.config.trimmedToc?.last, let index = self.spreads.firstIndex(withHref: trimEpubHrefComments(maxChapter.href)) {
             self.paginationView.maxPageNumber = index
         }
-        
-        let initialIndex: Int = {
-            if let href = locator?.href, let foundIndex = spreads.firstIndex(withHref: href) {
-                return foundIndex
-            } else {
-                return 0
-            }
-        }()
         
         paginationView.reloadAtIndex(initialIndex, location: PageLocation(locator), pageCount: spreads.count, readingProgression: readingProgression) {
             self.on(.loaded)
