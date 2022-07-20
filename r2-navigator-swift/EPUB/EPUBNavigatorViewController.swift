@@ -468,13 +468,10 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
             initialIndex = 0
         }
         
-        if let minChapter = self.config.trimmedToc?.first, let index = self.spreads.firstIndex(withHref: trimEpubHrefComments(minChapter.href)) {
-            self.paginationView.minPageNumber = index
-            initialIndex = max(index, initialIndex)
-        }
-        
-        if let maxChapter = self.config.trimmedToc?.last, let index = self.spreads.firstIndex(withHref: trimEpubHrefComments(maxChapter.href)) {
-            self.paginationView.maxPageNumber = index
+        if let trimmedToc = self.config.trimmedToc {
+            let pageNumbers = trimmedToc.map(\.href).map(trimEpubHrefComments).compactMap(spreads.firstIndex)
+            initialIndex = max(pageNumbers.first ?? 0, initialIndex)
+            paginationView.pageNumbers = pageNumbers
         }
         
         paginationView.reloadAtIndex(initialIndex, location: PageLocation(locator), pageCount: spreads.count, readingProgression: readingProgression) {
@@ -879,7 +876,12 @@ extension EPUBNavigatorViewController: PaginationViewDelegate {
     
     func paginationView(_ paginationView: PaginationView, pageViewAtIndex index: Int) -> (UIView & PageView)? {
         let spread = spreads[index]
-        if let trimmedToc = config.trimmedToc, !trimmedToc.isEmpty, trimmedToc.map(\.href).map( trimEpubHrefComments).map({ spread.contains(href: $0) }).filter({ $0 }).isEmpty {
+        if let trimmedToc = config.trimmedToc, !trimmedToc.isEmpty {
+            let pageNumbers = trimmedToc.map(\.href).map(trimEpubHrefComments).compactMap({ self.spreads.firstIndex(withHref: $0) })
+            paginationView.pageNumbers = pageNumbers
+        }
+        
+        if let trimmedToc = config.trimmedToc, trimmedToc.map(\.href).map(trimEpubHrefComments).map({ spread.contains(href: $0) }).filter({ $0 }).isEmpty {
             return nil
         }
         let spreadViewType = (spread.layout == .fixed) ? EPUBFixedSpreadView.self : EPUBReflowableSpreadView.self
