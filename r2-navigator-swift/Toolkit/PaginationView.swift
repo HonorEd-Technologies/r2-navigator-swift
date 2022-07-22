@@ -420,8 +420,11 @@ extension PaginationView: UIScrollViewDelegate {
             let currentOffset = (readingProgression == .rtl)
                 ? scrollView.contentSize.height - (scrollView.contentOffset.y + scrollView.frame.height)
                 : scrollView.contentOffset.y
-            let newIndex = Int(round(currentOffset / scrollView.frame.height)) + minPage
-            
+            var newIndex = Int(round(currentOffset / scrollView.frame.height))
+            if let pageNumbers = self.pageNumbers {
+                let sortedPages = Array(Set(pageNumbers)).sorted()
+                newIndex = pageNumbers[newIndex]
+            }
             setCurrentIndex(newIndex)
         }
         else {
