@@ -4770,7 +4770,9 @@ function appendVirtualColumnIfNeeded() {
   const id = "readium-virtual-page";
   var virtualCol = document.getElementById(id);
   if (isScrollModeEnabled() || getColumnCountPerScreen() != 2) {
-    virtualCol?.remove();
+    if (virtualCol) {
+      virtualCol.remove();
+    }
   } else {
     var documentWidth = document.scrollingElement.scrollWidth;
     var pageWidth = window.innerWidth;
