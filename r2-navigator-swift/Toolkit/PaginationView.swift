@@ -377,12 +377,12 @@ final class PaginationView: UIView, Loggable {
 
         scrollView.isScrollEnabled = true
         setCurrentIndex(index, location: location, completion: completion)
-        let minPage = pageNumbers?.first ?? 0
+        let minPage = pageNumbers?.sorted().first ?? 0
 
         scrollView.scrollRectToVisible(CGRect(
             origin: CGPoint(
                 x: self.verticalScroll ? scrollView.contentOffset.x : xOffsetForIndex(index),
-                y: self.verticalScroll ? yOffsetForIndex(index - minPage) : scrollView.contentOffset.y
+                y: self.verticalScroll ? yOffsetForIndex(indexForTrimmedPage(index, minPage: minPage)) : scrollView.contentOffset.y
             ),
             size: scrollView.frame.size
         ), animated: false)
@@ -423,7 +423,7 @@ extension PaginationView: UIScrollViewDelegate {
             var newIndex = Int(round(currentOffset / scrollView.frame.height))
             if let pageNumbers = self.pageNumbers {
                 let sortedPages = Array(Set(pageNumbers)).sorted()
-                newIndex = pageNumbers[newIndex]
+                newIndex = sortedPages[newIndex]
             }
             setCurrentIndex(newIndex)
         }
