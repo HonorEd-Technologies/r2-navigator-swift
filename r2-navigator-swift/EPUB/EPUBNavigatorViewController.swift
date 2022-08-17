@@ -114,6 +114,7 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
     public var onSelection: ((_ selection: Selection) -> Void)?
     public var isAllowingSelection = true
     
+    public var onScrollViewDidScroll: ((Double) -> Void)?
     
     public var userSettings: UserSettings
 
@@ -208,6 +209,8 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
             }
         }
     }
+    
+    public var onIntersectingRects: (([DOMRect], Int) -> Void)?
 
     let config: Configuration
     private let publication: Publication
@@ -707,6 +710,20 @@ extension EPUBNavigatorViewController: EPUBSpreadViewDelegate {
         """
         
         spreadView.evaluateScript(videoControlScript)
+        spreadView.evaluateScript("readium.initializeIntersectionObserver();") { completion in
+            switch completion {
+            case .failure(let err):
+                print(err)
+            case .success:
+                break
+            }
+        }
+    }
+    
+    public func removeAnnotations() {
+        for name in decorations.keys {
+            apply(decorations: [], in: name)
+        }
     }
 
     func spreadView(_ spreadView: EPUBSpreadView, didTapAt point: CGPoint) {
@@ -876,16 +893,12 @@ extension EPUBNavigatorViewController: PaginationViewDelegate {
     
     func paginationView(_ paginationView: PaginationView, pageViewAtIndex index: Int) -> (UIView & PageView)? {
         let spread = spreads[index]
-<<<<<<< HEAD
         if let trimmedToc = config.trimmedToc, !trimmedToc.isEmpty {
             let pageNumbers = trimmedToc.map(\.href).map(trimEpubHrefComments).compactMap({ self.spreads.firstIndex(withHref: $0) })
             paginationView.pageNumbers = pageNumbers
         }
         
         if let trimmedToc = config.trimmedToc, trimmedToc.map(\.href).map(trimEpubHrefComments).map({ spread.contains(href: $0) }).filter({ $0 }).isEmpty {
-=======
-        if let trimmedToc = config.trimmedToc, trimmedToc.map({ spread.contains(href: $0.href) }).filter({ $0 }).isEmpty {
->>>>>>> da9bb34 (init commit)
             return nil
         }
         let spreadViewType = (spread.layout == .fixed) ? EPUBFixedSpreadView.self : EPUBReflowableSpreadView.self
@@ -904,8 +917,26 @@ extension EPUBNavigatorViewController: PaginationViewDelegate {
 
         let userContentController = spreadView.webView.configuration.userContentController
         delegate?.navigator(self, setupUserScripts: userContentController)
+        
+        spreadView.registerJSMessage(named: "visibleRects", handler: { [weak self] val in
+            self?.handleIntersectingRects(val: val, page: index)
+        })
+        
+        spreadView.registerJSMessage(named: "offsetChanged", handler: handleOffsetChanged)
 
         return spreadView
+    }
+    
+    func handleOffsetChanged(val: Any) {
+        if let double = val as? Double {
+            onScrollViewDidScroll?(double)
+        }
+    }
+    
+    func handleIntersectingRects(val: Any, page: Int) {
+        guard let dict = val as? [String: Any], let rectsJson = dict["rects"] as? [[String: Any]] else { return }
+        let rects = rectsJson.compactMap(DOMRect.init)
+        onIntersectingRects?(rects, page)
     }
     
     func paginationViewDidUpdateViews(_ paginationView: PaginationView) {
