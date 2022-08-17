@@ -70,6 +70,7 @@ final class PaginationView: UIView, Loggable {
     /// Pre-loaded page views, indexed by their position.
     private(set) var loadedViews: [Int: (UIView & PageView)] = [:]
     
+    // Pre-loaded page numbers, for non-consecutive chapters given an array of Links
     public var pageNumbers: [Int]?
     
     /// Number of positions (as in `Publication.positionList`) to preload before and after the
@@ -148,9 +149,8 @@ final class PaginationView: UIView, Loggable {
         let size = scrollView.bounds.size
         if self.verticalScroll {
             var totalHeight: CGFloat = 0
-            let minPage = pageNumbers?.first ?? 0
-            let maxPage = pageNumbers?.last ?? pageCount
-            var totalPages = maxPage - minPage + 1
+            var totalPages = pageCount + 1
+            // if we are trimming, use the number of unique pages within pageNumbers
             if let pageNumbers = pageNumbers {
                 totalPages = Array(Set(pageNumbers)).count
             }
@@ -182,6 +182,7 @@ final class PaginationView: UIView, Loggable {
             : scrollView.bounds.height * CGFloat(index)
     }
     
+    // finds the index within pageNumbers where the spread's index occurs, adjusted for the minimum page number
     private func indexForTrimmedPage(_ index: Int, minPage: Int) -> Int {
         guard let pageNumbers = pageNumbers, let pageIndex = Array(Set(pageNumbers)).sorted().firstIndex(of: index) else {
             return index - minPage
