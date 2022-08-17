@@ -4087,6 +4087,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _gestures__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./gestures */ "./src/gestures.js");
 /* harmony import */ var _utils__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./utils */ "./src/utils.js");
 /* harmony import */ var _decorator__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./decorator */ "./src/decorator.js");
+/* harmony import */ var _vendor_hypothesis_anchoring_text_range__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./vendor/hypothesis/anchoring/text-range */ "./src/vendor/hypothesis/anchoring/text-range.js");
+/* harmony import */ var _vendor_hypothesis_anchoring_types__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./vendor/hypothesis/anchoring/types */ "./src/vendor/hypothesis/anchoring/types.js");
 //
 //  Copyright 2021 Readium Foundation. All rights reserved.
 //  Use of this source code is governed by the BSD-style license
@@ -4097,8 +4099,226 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
+function initializeIntersectionObserver() {
+    const callback = (elements, observer) => {
+        var intersectingRects = []
+        elements.forEach((entry) => {
+            if (entry.target.innerText && entry.target.innerText != "") {
+                let intersectionRect = toNativeRect(entry.intersectionRect)
+                intersectingRects.push({
+                    x: intersectionRect.left,
+                    y: intersectionRect.top,
+                    width: intersectionRect.width,
+                    height: intersectionRect.height,
+                    innerHTML: entry.target.innerText,
+                    intersectionRatio: entry.intersectionRatio
+                })
+            }
+        })
+        
+        webkit.messageHandlers.visibleRects.postMessage({
+            rects: intersectingRects
+        })
+    }
+    
+    let options = {
+        threshold: buildIntersectionBreakpoints(10)
+    }
+    
+    let observer = new IntersectionObserver(callback, options)
+    
+    const textNodes = Array.from(document.querySelectorAll("p, h1, h2, h3, strong"))
+    
+    textNodes.forEach((node) => observer.observe(node))
+}
+    
+function buildIntersectionBreakpoints(numSteps) {
+    var steps = [0.0]
+    for (let i = 1.0; i < numSteps.length; i++) {
+        steps.push(i / numSteps)
+    }
+    steps.push(1.0)
+    return steps
+}
+    
+function toNativeRect(rect) {
+  let point = adjustPointToViewport({ x: rect.left, y: rect.top });
 
+  const width = rect.width;
+  const height = rect.height;
+  const left = point.x;
+  const top = point.y;
+  const right = left + width;
+  const bottom = top + height;
+  return { width, height, left, top, right, bottom };
+}
 
+/**
+ * Adjusts the given coordinates to the viewport for FXL resources.
+ */
+function adjustPointToViewport(point) {
+  if (!frameElement) {
+    return point;
+  }
+  let frameRect = frameElement.getBoundingClientRect();
+  if (!frameRect) {
+    return point;
+  }
+
+  let topScrollingElement = window.top.document.documentElement;
+  return {
+    x: point.x + frameRect.x + topScrollingElement.scrollLeft,
+    y: point.y + frameRect.y + topScrollingElement.scrollTop,
+  };
+}
+
+function rectsFromTexts(texts) {
+    return texts.map((text) => {
+        let range = _utils__WEBPACK_IMPORTED_MODULE_1__.rangeFromLocator({
+            text: {
+                highlight: text.text
+            }
+        })
+        if (!range) {
+            return undefined
+        }
+        let rect = toNativeRect(range.getBoundingClientRect())
+        return {
+            x: rect.left,
+            y: rect.top,
+            width: rect.width,
+            height: rect.height,
+            innerHTML: text.text,
+            intersectionRatio: text.intersectionRatio
+        }
+    }).filter((rect) => rect)
+}
+    
+function textFromRect(rect) {
+    let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, strong")).filter((el) => el.innerText && el.innerText.trim() != "")
+    const containsRect = (superRect, el) => {
+        let frame = el.getBoundingClientRect()
+        let isFullyContained = superRect.y <= frame.y && superRect.y + superRect.height >= frame.y + frame.height
+        let isOverlappingAbove = superRect.y >= frame.y && frame.y + frame.height>= superRect.y && frame.y + frame.height <= superRect.y + superRect.height
+        let isOverlappingBelow = superRect.y <= frame.y && frame.y <= superRect.y + superRect.height && frame.y + frame.height >= superRect.y + superRect.height
+        let isContaining = superRect.y >= frame.y && superRect.y + superRect.height <= frame.y + frame.height
+        return isFullyContained || isOverlappingBelow || isOverlappingAbove || isContaining
+    }
+    
+    let containingTextElements = textElements.filter((el) => containsRect(rect, el))
+    var texts = containingTextElements.map((el) => {
+        return el.innerText
+    })
+    var text = ""
+    for (var i = 0; i < texts.length; i++) {
+        text = text + (i === 0 ? "" : "\n")+ texts[i]
+    }
+    text = text.trim().replace(/\n/g, " ").replace(/\s\s+/g, " ")
+    var anchor = new _vendor_hypothesis_anchoring_types__WEBPACK_IMPORTED_MODULE_0__.TextQuoteAnchor(document.body, text)
+    var range = anchor.toRange()
+    const shouldContinueTrimmingAbove = (range) => {
+        if (!range || range.collapsed) {
+            return false
+        }
+        let boundingRect = range.getBoundingClientRect()
+        return boundingRect.y < rect.y
+    }
+    const shouldContinueTrimmingBelow = (range) => {
+        if (!range || range.collapsed) {
+            return false
+        }
+        let boundingRect = range.getBoundingClientRect()
+        return boundingRect.y + boundingRect.height > rect.y + rect.height
+    }
+    while (shouldContinueTrimmingAbove(range)) {
+        let nextWordIndex = text.indexOf(" ")
+        if (!nextWordIndex) {
+            break
+        }
+        text = text.slice(nextWordIndex + 1)
+        var anchor = new _vendor_hypothesis_anchoring_types__WEBPACK_IMPORTED_MODULE_0__.TextQuoteAnchor(document.body, text)
+        let newRange = anchor.toRange()
+        if (!newRange || newRange.collapsed) continue
+        range = newRange
+    }
+    
+    while (shouldContinueTrimmingBelow(range)) {
+        let nextWordIndex = text.lastIndexOf(" ")
+        if (!nextWordIndex) {
+            break
+        }
+        text = text.slice(0, nextWordIndex)
+        var anchor = new _vendor_hypothesis_anchoring_types__WEBPACK_IMPORTED_MODULE_0__.TextQuoteAnchor(document.body, text)
+        let newRange = anchor.toRange()
+        if (!newRange || newRange.collapsed) continue
+        range = newRange
+    }
+    return text
+}
+    
+function rectsFromLocatorText(locators) {
+    let rects = locators.map((locator) => {
+        return rectFromLocatorText(locator)
+    })
+    return rects.filter((rect) => rect)
+}
+    
+function rectFromLocatorText(locator) {
+    let range = _utils__WEBPACK_IMPORTED_MODULE_1__.rangeFromLocator(locator)
+    if (!range) {
+        return undefined
+    }
+    let rect = toNativeRect(range.getBoundingClientRect())
+    return {
+        x: rect.left,
+        y: rect.top,
+        width: rect.width,
+        height: rect.height
+    }
+}
+    
+function selectionText(totalText) {
+    const cleanHighlight = totalText.trim()
+        .replace(/\n/g, " ")
+        .replace(/\s\s+/g, " ");
+    if (cleanHighlight.length === 0) {
+      return undefined;
+    }
+    
+    const documentText = document.body.textContent
+    
+    let range = _utils__WEBPACK_IMPORTED_MODULE_1__.rangeFromLocator({
+        text: {
+            highlight: cleanHighlight
+        }
+    })
+    if (!range) {
+      return undefined
+    }
+    
+    const textRange =  _vendor_hypothesis_anchoring_text_range__WEBPACK_IMPORTED_MODULE_2__.TextRange.fromRange(range).relativeTo(document.body);
+
+    const start = textRange.start.offset;
+    const end = textRange.end.offset;
+
+    const snippetLength = 200;
+
+    // Compute the text before the highlight, ignoring the first "word", which might be cut.
+    let before = documentText.slice(Math.max(0, start - snippetLength), start);
+    let firstWordStart = before.search(/\P{L}\p{L}/gu);
+    if (firstWordStart !== -1) {
+      before = before.slice(firstWordStart + 1);
+    }
+
+    // Compute the text after the highlight, ignoring the last "word", which might be cut.
+    let after = documentText.slice(end, Math.min(documentText.length, end + snippetLength));
+    let lastWordEnd = Array.from(after.matchAll(/\p{L}\P{L}/gu)).pop();
+    if (lastWordEnd !== undefined && lastWordEnd.index > 1) {
+      after = after.slice(0, lastWordEnd.index + 1);
+    }
+    const actualHighlight = documentText.slice(start,end);
+    return { highlight: actualHighlight, before, after };
+}
 // Public API used by the navigator.
 window.readium = {
   // utils
@@ -4113,6 +4333,12 @@ window.readium = {
   // decoration
   registerDecorationTemplates: _decorator__WEBPACK_IMPORTED_MODULE_2__.registerTemplates,
   getDecorations: _decorator__WEBPACK_IMPORTED_MODULE_2__.getDecorations,
+  initializeIntersectionObserver: initializeIntersectionObserver,
+  rectsFromTexts: rectsFromTexts,
+  textFromRect: textFromRect,
+  selectionText: selectionText,
+  rectFromLocatorText: rectFromLocatorText,
+  rectsFromLocatorText: rectsFromLocatorText,
 };
 
 
@@ -4802,6 +5028,10 @@ function update(position) {
   var positionString = position.toString();
   webkit.messageHandlers.progressionChanged.postMessage(positionString);
 }
+    
+function updateOffset(offset) {
+    webkit.messageHandlers.offsetChanged.postMessage(offset)
+}
 
 window.addEventListener("scroll", function () {
   last_known_scrollY_position =
@@ -4826,6 +5056,7 @@ window.addEventListener("scroll", function () {
           ? last_known_scrollY_position
           : last_known_scrollX_position
       );
+      updateOffset(isScrollModeEnabled() ? window.scrollY : window.scrollX)
       ticking = false;
     });
   }
@@ -8010,7 +8241,7 @@ module.exports = function sign(number) {
 /************************************************************************/
 /******/ 	// The module cache
 /******/ 	var __webpack_module_cache__ = {};
-/******/ 	
+/******/
 /******/ 	// The require function
 /******/ 	function __webpack_require__(moduleId) {
 /******/ 		// Check if module is in cache
@@ -8024,14 +8255,14 @@ module.exports = function sign(number) {
 /******/ 			// no module.loaded needed
 /******/ 			exports: {}
 /******/ 		};
-/******/ 	
+/******/
 /******/ 		// Execute the module function
 /******/ 		__webpack_modules__[moduleId](module, module.exports, __webpack_require__);
-/******/ 	
+/******/
 /******/ 		// Return the exports of the module
 /******/ 		return module.exports;
 /******/ 	}
-/******/ 	
+/******/
 /************************************************************************/
 /******/ 	/* webpack/runtime/compat get default export */
 /******/ 	(() => {
@@ -8044,7 +8275,7 @@ module.exports = function sign(number) {
 /******/ 			return getter;
 /******/ 		};
 /******/ 	})();
-/******/ 	
+/******/
 /******/ 	/* webpack/runtime/define property getters */
 /******/ 	(() => {
 /******/ 		// define getter functions for harmony exports
@@ -8056,12 +8287,12 @@ module.exports = function sign(number) {
 /******/ 			}
 /******/ 		};
 /******/ 	})();
-/******/ 	
+/******/
 /******/ 	/* webpack/runtime/hasOwnProperty shorthand */
 /******/ 	(() => {
 /******/ 		__webpack_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
 /******/ 	})();
-/******/ 	
+/******/
 /******/ 	/* webpack/runtime/make namespace object */
 /******/ 	(() => {
 /******/ 		// define __esModule on exports
@@ -8072,7 +8303,7 @@ module.exports = function sign(number) {
 /******/ 			Object.defineProperty(exports, '__esModule', { value: true });
 /******/ 		};
 /******/ 	})();
-/******/ 	
+/******/
 /************************************************************************/
 var __webpack_exports__ = {};
 // This entry need to be wrapped in an IIFE because it need to be in strict mode.
