@@ -4174,12 +4174,15 @@ function adjustPointToViewport(point) {
 
 function rectsFromTexts(texts) {
     return texts.map((text) => {
+        let cleanHighlight = text.text.trim()
+            .replace(/\n/g, " ")
+            .replace(/\s\s+/g, " ");
         let range = _utils__WEBPACK_IMPORTED_MODULE_1__.rangeFromLocator({
             text: {
-                highlight: text.text
+                highlight: cleanHighlight
             }
         })
-        if (!range) {
+        if (!range || range.collapsed) {
             return undefined
         }
         let rect = toNativeRect(range.getBoundingClientRect())
