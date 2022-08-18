@@ -4127,7 +4127,7 @@ function initializeIntersectionObserver() {
     
     let observer = new IntersectionObserver(callback, options)
     
-    const textNodes = Array.from(document.querySelectorAll("p, h1, h2, h3, strong"))
+    const textNodes = Array.from(document.querySelectorAll("p, h1, h2, h3, strong, figcaption, code, li, dt"))
     
     textNodes.forEach((node) => observer.observe(node))
 }
@@ -4183,6 +4183,9 @@ function rectsFromTexts(texts) {
             return undefined
         }
         let rect = toNativeRect(range.getBoundingClientRect())
+        if (rect.bottom < 0 || rect.top > window.innerHeight) {
+            return undefined
+        }
         return {
             x: rect.left,
             y: rect.top,
@@ -4195,7 +4198,7 @@ function rectsFromTexts(texts) {
 }
     
 function textFromRect(rect) {
-    let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, strong")).filter((el) => el.innerText && el.innerText.trim() != "")
+    let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, strong, figcaption, code, li, dt")).filter((el) => el.innerText && el.innerText.trim() != "")
     const containsRect = (superRect, el) => {
         let frame = el.getBoundingClientRect()
         let isFullyContained = superRect.y <= frame.y && superRect.y + superRect.height >= frame.y + frame.height
