@@ -435,7 +435,7 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
     private var spreads: [EPUBSpread] = []
 
     /// Index of the currently visible spread.
-    private var currentSpreadIndex: Int {
+    public var currentSpreadIndex: Int {
         return paginationView.currentIndex
     }
 
