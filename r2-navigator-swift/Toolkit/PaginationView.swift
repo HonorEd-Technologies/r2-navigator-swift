@@ -189,6 +189,7 @@ final class PaginationView: UIView, Loggable {
         }
         return Int(pageIndex)
     }
+    
     /// Reloads the pagination with the given total number of pages and current index.
     ///
     /// - Parameters:
