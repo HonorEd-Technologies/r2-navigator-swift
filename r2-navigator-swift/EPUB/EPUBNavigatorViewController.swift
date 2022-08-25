@@ -460,21 +460,19 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
         let locator = locator ?? currentLocation
         spreads = EPUBSpread.makeSpreads(for: publication, readingProgression: readingProgression, pageCountPerSpread: pageCountPerSpread)
         
-        if let minChapter = self.config.trimmedToc?.first, let index = self.spreads.firstIndex(withHref: minChapter.href) {
-            self.paginationView.minPageNumber = index
+        var initialIndex: Int
+        
+        if let href = locator?.href, let foundIndex = spreads.firstIndex(withHref: href) {
+            initialIndex = foundIndex
+        } else {
+            initialIndex = 0
         }
         
-        if let maxChapter = self.config.trimmedToc?.last, let index = self.spreads.firstIndex(withHref: maxChapter.href) {
-            self.paginationView.maxPageNumber = index
+        if let trimmedToc = self.config.trimmedToc {
+            let pageNumbers = trimmedToc.map(\.href).map(trimEpubHrefComments).compactMap(spreads.firstIndex)
+            initialIndex = max(pageNumbers.first ?? 0, initialIndex)
+            paginationView.pageNumbers = pageNumbers
         }
-        
-        let initialIndex: Int = {
-            if let href = locator?.href, let foundIndex = spreads.firstIndex(withHref: href) {
-                return foundIndex
-            } else {
-                return 0
-            }
-        }()
         
         paginationView.reloadAtIndex(initialIndex, location: PageLocation(locator), pageCount: spreads.count, readingProgression: readingProgression) {
             self.on(.loaded)
@@ -878,7 +876,12 @@ extension EPUBNavigatorViewController: PaginationViewDelegate {
     
     func paginationView(_ paginationView: PaginationView, pageViewAtIndex index: Int) -> (UIView & PageView)? {
         let spread = spreads[index]
-        if let trimmedToc = config.trimmedToc, trimmedToc.map({ spread.contains(href: $0.href) }).filter({ $0 }).isEmpty {
+        if let trimmedToc = config.trimmedToc, !trimmedToc.isEmpty {
+            let pageNumbers = trimmedToc.map(\.href).map(trimEpubHrefComments).compactMap({ self.spreads.firstIndex(withHref: $0) })
+            paginationView.pageNumbers = pageNumbers
+        }
+        
+        if let trimmedToc = config.trimmedToc, trimmedToc.map(\.href).map(trimEpubHrefComments).map({ spread.contains(href: $0) }).filter({ $0 }).isEmpty {
             return nil
         }
         let spreadViewType = (spread.layout == .fixed) ? EPUBFixedSpreadView.self : EPUBReflowableSpreadView.self
@@ -987,4 +990,12 @@ extension EPUBNavigatorViewController {
     @available(*, unavailable, renamed: "go(to:)")
     public func displayReadingOrderItem(with href: String) -> Int? { nil }
     
+}
+
+public func trimEpubHrefComments(_ href: String) -> String {
+    if href.contains("#") {
+        return String(href.prefix(while: { $0 != "#" }))
+    } else {
+        return href
+    }
 }
