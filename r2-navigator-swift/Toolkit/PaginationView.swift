@@ -149,8 +149,9 @@ final class PaginationView: UIView, Loggable {
         let size = scrollView.bounds.size
         if self.verticalScroll {
             var totalHeight: CGFloat = 0
-            var totalPages = pageCount + 1
-            // if we are trimming, use the number of unique pages within pageNumbers
+            let minPage = pageNumbers?.first ?? 0
+            let maxPage = pageNumbers?.last ?? pageCount
+            var totalPages = maxPage - minPage + 1
             if let pageNumbers = pageNumbers {
                 totalPages = Array(Set(pageNumbers)).count
             }
