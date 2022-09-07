@@ -4211,8 +4211,22 @@ function textFromRect(rect) {
         return isFullyContained || isOverlappingBelow || isOverlappingAbove || isContaining
     }
     
+    const isRectUnique = (el) => {
+        let rect = el.getBoundingClientRect()
+        let otherRects = containingTextElements.map((_el) => _el.getBoundingClientRect()).filter((_rect) => {
+            return _rect.y != rect.y || _rect.height != rect.height
+        })
+        for (var i = 0; i < otherRects.length; i++) {
+            let otherRect = otherRects[i]
+            if (otherRect.y >= rect.y && (rect.y + rect.height) >= (otherRect.y + otherRect.height)) {
+                return false
+            }
+        }
+        return true
+    }
+    
     let containingTextElements = textElements.filter((el) => containsRect(rect, el))
-    var texts = containingTextElements.map((el) => {
+    var texts = containingTextElements.filter((el) => isRectUnique(el)).map((el) => {
         return el.innerText
     })
     var text = ""
@@ -4220,8 +4234,14 @@ function textFromRect(rect) {
         text = text + (i === 0 ? "" : "\n")+ texts[i]
     }
     text = text.trim().replace(/\n/g, " ").replace(/\s\s+/g, " ")
-    var anchor = new _vendor_hypothesis_anchoring_types__WEBPACK_IMPORTED_MODULE_0__.TextQuoteAnchor(document.body, text)
-    var range = anchor.toRange()
+    var anchor = undefined
+    var range = undefined
+    try {
+        anchor = new _vendor_hypothesis_anchoring_types__WEBPACK_IMPORTED_MODULE_0__.TextQuoteAnchor(document.body, text)
+        range = anchor.toRange()
+    } catch {
+        return text
+    }
     const shouldContinueTrimmingAbove = (range) => {
         if (!range || range.collapsed) {
             return false
@@ -4242,8 +4262,13 @@ function textFromRect(rect) {
             break
         }
         text = text.slice(nextWordIndex + 1)
-        var anchor = new _vendor_hypothesis_anchoring_types__WEBPACK_IMPORTED_MODULE_0__.TextQuoteAnchor(document.body, text)
-        let newRange = anchor.toRange()
+        var newRange = undefined
+        try {
+            anchor = new _vendor_hypothesis_anchoring_types__WEBPACK_IMPORTED_MODULE_0__.TextQuoteAnchor(document.body, text)
+            newRange = anchor.toRange()
+        } catch {
+            continue
+        }
         if (!newRange || newRange.collapsed) continue
         range = newRange
     }
@@ -4254,8 +4279,13 @@ function textFromRect(rect) {
             break
         }
         text = text.slice(0, nextWordIndex)
-        var anchor = new _vendor_hypothesis_anchoring_types__WEBPACK_IMPORTED_MODULE_0__.TextQuoteAnchor(document.body, text)
-        let newRange = anchor.toRange()
+        var newRange = undefined
+        try {
+            anchor = new _vendor_hypothesis_anchoring_types__WEBPACK_IMPORTED_MODULE_0__.TextQuoteAnchor(document.body, text)
+            newRange = anchor.toRange()
+        } catch {
+            continue
+        }
         if (!newRange || newRange.collapsed) continue
         range = newRange
     }
