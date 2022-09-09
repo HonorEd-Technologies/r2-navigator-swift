@@ -710,14 +710,6 @@ extension EPUBNavigatorViewController: EPUBSpreadViewDelegate {
         """
         
         spreadView.evaluateScript(videoControlScript)
-        spreadView.evaluateScript("readium.initializeIntersectionObserver();") { completion in
-            switch completion {
-            case .failure(let err):
-                print(err)
-            case .success:
-                break
-            }
-        }
     }
     
     public func removeAnnotations() {
@@ -918,10 +910,6 @@ extension EPUBNavigatorViewController: PaginationViewDelegate {
         let userContentController = spreadView.webView.configuration.userContentController
         delegate?.navigator(self, setupUserScripts: userContentController)
         
-        spreadView.registerJSMessage(named: "visibleRects", handler: { [weak self] val in
-            self?.handleIntersectingRects(val: val, page: index)
-        })
-        
         spreadView.registerJSMessage(named: "offsetChanged", handler: handleOffsetChanged)
 
         return spreadView
@@ -931,12 +919,6 @@ extension EPUBNavigatorViewController: PaginationViewDelegate {
         if let double = val as? Double {
             onScrollViewDidScroll?(double)
         }
-    }
-    
-    func handleIntersectingRects(val: Any, page: Int) {
-        guard let dict = val as? [String: Any], let rectsJson = dict["rects"] as? [[String: Any]] else { return }
-        let rects = rectsJson.compactMap(DOMRect.init)
-        onIntersectingRects?(rects, page)
     }
     
     func paginationViewDidUpdateViews(_ paginationView: PaginationView) {
