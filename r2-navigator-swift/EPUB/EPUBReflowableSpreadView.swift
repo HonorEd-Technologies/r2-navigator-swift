@@ -169,7 +169,7 @@ final class EPUBReflowableSpreadView: EPUBSpreadView {
         // This delay is used to wait for the web view pagination to settle and give the CSS and webview time to layout
         // correctly before attempting to scroll to the target progression, otherwise we might end up at the wrong spot.
         // 0.2 seconds seems like a good value for it to work on an iPhone 5s.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             let location = self.pendingLocation
             self.go(to: location) {
                 // The rendering is sometimes very slow. So in case we don't show the first page of the resource, we add

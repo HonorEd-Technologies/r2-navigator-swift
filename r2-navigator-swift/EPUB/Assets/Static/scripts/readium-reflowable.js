@@ -3685,6 +3685,29 @@ function getDecorations(groupName) {
   return group;
 }
 
+    function groupExistsInTargets(group, targets) {
+        for (var i = 0; i < targets.length; i++) {
+            let target = targets[i];
+            if (target.group == group) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    
+    function groupExistsInTargets(group, targets) {
+        for (var i = 0; i < targets.length; i++) {
+            let target = targets[i];
+            if (target.group == group) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+    
 /**
  * Handles click events on a Decoration.
  * Returns whether a decoration matched this event.
@@ -3694,37 +3717,54 @@ function handleDecorationClickEvent(event, clickEvent) {
     return false;
   }
 
-  function findTarget() {
-    for (const [group, groupContent] of groups) {
-      if (!groupContent.isActivable()) {
-        continue;
-      }
-
-      for (const item of groupContent.items.reverse()) {
-        if (!item.clickableElements) {
-          continue;
+    function findTargets() {
+        var targetsFound = new Array();
+        for (const [group, groupContent] of groups) {
+            if (!groupContent.isActivable()) {
+                continue;
+            }
+            
+            for (const item of groupContent.items.reverse()) {
+                if (!item.clickableElements) {
+                    continue;
+                }
+                for (const element of item.clickableElements) {
+                    let rect = element.getBoundingClientRect().toJSON();
+                    if ((0,_rect__WEBPACK_IMPORTED_MODULE_0__.rectContainsPoint)(rect, event.clientX, event.clientY, 1)) {
+                       if (groupExistsInTargets(group, targetsFound)) {
+                            continue;
+                        }
+                        
+                        targetsFound.push({ group, item, element, rect });
+                    }
+                }
+            }
         }
-        for (const element of item.clickableElements) {
-          let rect = element.getBoundingClientRect().toJSON();
-          if ((0,_rect__WEBPACK_IMPORTED_MODULE_0__.rectContainsPoint)(rect, event.clientX, event.clientY, 1)) {
-            return { group, item, element, rect };
-          }
-        }
-      }
+        
+        return targetsFound;
     }
-  }
 
-  let target = findTarget();
-  if (!target) {
+  let targets = findTargets();
+  if (!targets) {
     return false;
   }
-  webkit.messageHandlers.decorationActivated.postMessage({
-    id: target.item.decoration.id,
-    group: target.group,
-    rect: (0,_rect__WEBPACK_IMPORTED_MODULE_0__.toNativeRect)(target.item.range.getBoundingClientRect()),
-    click: clickEvent,
-  });
-  return true;
+    var returningArray = new Array();
+    var targetsLength = targets.length;
+    for (var i = 0; i < targetsLength; i++) {
+        let target = targets[i];
+        
+        returningArray.push(
+                          {
+                            id: target.item.decoration.id,
+                            group: target.group,
+                            rect: (0,_rect__WEBPACK_IMPORTED_MODULE_0__.toNativeRect)(target.item.range.getBoundingClientRect()),
+                            click: clickEvent,
+                          }
+                          );
+    }
+    
+    webkit.messageHandlers.decorationActivated.postMessage(returningArray);
+    return true;
 }
 
 /**
@@ -4204,6 +4244,7 @@ function textFromRect(rect) {
     let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, strong, figcaption, code, li, dt, td, title, div")).filter((el) => el.innerText && el.innerText.trim() != "")
     const containsRect = (superRect, el) => {
         let frame = el.getBoundingClientRect()
+        if (frame.height === 0) { return false }
         let isFullyContained = superRect.y <= frame.y && superRect.y + superRect.height >= frame.y + frame.height
         let isOverlappingAbove = superRect.y >= frame.y && frame.y + frame.height>= superRect.y && frame.y + frame.height <= superRect.y + superRect.height
         let isOverlappingBelow = superRect.y <= frame.y && frame.y <= superRect.y + superRect.height && frame.y + frame.height >= superRect.y + superRect.height

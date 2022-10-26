@@ -491,6 +491,28 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
     
     // MARK: - Navigator
     
+    public var progressWithinSpread: Double? {
+        guard let spreadView = paginationView.currentView as? EPUBSpreadView else {
+            return nil
+        }
+        
+        let link = spreadView.focusedResource ?? spreadView.spread.leading
+        let href = link.href
+        let progression = spreadView.progression(in: href)
+        
+        guard let currentLocation = currentLocation,
+              let trimmedToc = config.trimmedToc,
+              let trimmedLocation = publication.trimmedPositions(currentLocation, trimmedToc: trimmedToc),
+              let index = trimmedLocation.firstIndex(
+                where: { $0.firstIndex(where: { location in
+                    currentLocation.href == location.href
+                }) != nil }),
+              let positionList = Optional(trimmedLocation[index]),
+              positionList.count != 0 else { return nil }
+        let positionIndex = Int(ceil(progression * Double(positionList.count - 1)))
+        return positionList[positionIndex].locations.totalProgression
+    }
+    
     public var currentLocation: Locator? {
         // Returns any pending locator to prevent returning invalid locations while loading it.
         if case let .jumping(pendingLocator) = state {
@@ -605,6 +627,9 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
 
     /// Decoration group callbacks, indexed by the group name.
     private var decorationCallbacks: [String: [DecorableNavigator.OnActivatedCallback]] = [:]
+    
+    /// Decoration callbacks for all the decorations types (not using any group clasification)
+    private var fullDecorationCallbacks: [DecorableNavigator.OnActivatedCallback] = []
 
     public func supports(decorationStyle style: Decoration.Style.Id) -> Bool {
         config.decorationTemplates.keys.contains(style)
@@ -635,7 +660,15 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
             }
         }
     }
+        
+    public func observeDecorationFullInteractions(onActivated: OnActivatedCallback?) {
+        guard let onActivated = onActivated else {
+            return
+        }
 
+        fullDecorationCallbacks.append(onActivated)
+    }
+    
     public func observeDecorationInteractions(inGroup group: String, onActivated: OnActivatedCallback?) {
         guard let onActivated = onActivated else {
             return
@@ -714,6 +747,12 @@ extension EPUBNavigatorViewController: EPUBSpreadViewDelegate {
     
     public func removeAnnotations() {
         for name in decorations.keys {
+            apply(decorations: [], in: name)
+        }
+    }
+    
+    public func removeSharedAnnotations() {
+        for name in decorations.keys where name == "sharedAnnotation" {
             apply(decorations: [], in: name)
         }
     }
@@ -819,19 +858,43 @@ extension EPUBNavigatorViewController: EPUBSpreadViewDelegate {
             return nil
         }
     }
-
-    func spreadView(_ spreadView: EPUBSpreadView, didActivateDecoration id: Decoration.Id, inGroup group: String, frame: CGRect?, point: CGPoint?) {
-        guard
-            let callbacks = decorationCallbacks[group].takeIf({ !$0.isEmpty }),
-            let decoration: Decoration = decorations[group]?
-                .first(where: { $0.decoration.id == id })
-                .map({ $0.decoration })
-        else {
-            return
+    
+    func spreadView(_ spreadView: EPUBSpreadView, activatedDecorations: [ActivatedDecorationEvent]) {
+        var adjustedDecorations = activatedDecorations
+        var callbacks: [DecorableNavigator.OnActivatedCallback] = []
+        
+        for (index, activatedDecoration) in activatedDecorations.enumerated() {
+            guard let decoration: Decoration = decorations[activatedDecoration.group]?
+                    .first(where: { $0.decoration.id == activatedDecoration.id })
+                    .map({ $0.decoration })
+            else {
+                continue
+            }
+            
+            if let foundCallbacks = decorationCallbacks[activatedDecoration.group].takeIf({ !$0.isEmpty }) {
+                callbacks.append(contentsOf: foundCallbacks)
+            }
+            
+            adjustedDecorations[index].decoration = decoration
         }
-
+        
+        let onDecorationActivateEvents = adjustedDecorations.compactMap { (activatedDecoration) -> OnDecorationActivatedEvent? in
+            guard let decoration = activatedDecoration.decoration else {
+                return nil
+            }
+            
+            return OnDecorationActivatedEvent(decoration: decoration,
+                                       group: activatedDecoration.group,
+                                       rect: activatedDecoration.frame,
+                                       point: activatedDecoration.point)
+        }
+        
         for callback in callbacks {
-            callback(OnDecorationActivatedEvent(decoration: decoration, group: group, rect: frame, point: point))
+            callback(onDecorationActivateEvents)
+        }
+        
+        for callback in fullDecorationCallbacks {
+            callback(onDecorationActivateEvents)
         }
     }
 

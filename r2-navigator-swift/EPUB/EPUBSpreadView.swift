@@ -8,6 +8,14 @@ import WebKit
 import R2Shared
 import SwiftSoup
 
+struct ActivatedDecorationEvent {
+    let id: Decoration.Id
+    let group: String
+    let frame: CGRect?
+    let point: CGPoint?
+    var decoration: Decoration?
+}
+
 protocol EPUBSpreadViewDelegate: AnyObject {
     /// Called when the spread view finished loading.
     func spreadViewDidLoad(_ spreadView: EPUBSpreadView)
@@ -21,8 +29,8 @@ protocol EPUBSpreadViewDelegate: AnyObject {
     /// Called when the user tapped on an internal link.
     func spreadView(_ spreadView: EPUBSpreadView, didTapOnInternalLink href: String, clickEvent: ClickEvent?)
 
-    /// Called when the user tapped on a decoration.
-    func spreadView(_ spreadView: EPUBSpreadView, didActivateDecoration id: Decoration.Id, inGroup group: String, frame: CGRect?, point: CGPoint?)
+    /// Called when the user tapped on a location that can have multiple decorations.
+    func spreadView(_ spreadView: EPUBSpreadView, activatedDecorations: [ActivatedDecorationEvent])
 
     /// Called when the text selection changes.
     func spreadView(_ spreadView: EPUBSpreadView, selectionDidChange text: Locator.Text?, frame: CGRect)
@@ -371,20 +379,32 @@ class EPUBSpreadView: UIView, Loggable, PageView {
 
     /// Called by the JavaScript layer when the user activates a decoration.
     private func decorationDidActivate(_ body: Any) {
-        guard
-            let decoration = body as? [String: Any],
-            let decorationId = decoration["id"] as? Decoration.Id,
-            let groupName = decoration["group"] as? String,
-            var frame = CGRect(json: decoration["rect"])
-        else {
-            log(.warning, "Invalid body for decorationDidActivate: \(body)")
+        guard let decorations = body as? [Any] else {
             return
         }
-
-        frame = convertRectToNavigatorSpace(frame)
-        let point = ClickEvent(json: decoration["click"])
-            .map { convertPointToNavigatorSpace($0.point) }
-        delegate?.spreadView(self, didActivateDecoration: decorationId, inGroup: groupName, frame: frame, point: point)
+        
+        var activatedDecorations: [ActivatedDecorationEvent] = []
+        
+        for decorationBody in decorations {
+            guard
+                let decoration = decorationBody as? [String: Any],
+                let decorationId = decoration["id"] as? Decoration.Id,
+                let groupName = decoration["group"] as? String,
+                var frame = CGRect(json: decoration["rect"])
+            else {
+                continue
+            }
+            
+            let point = ClickEvent(json: decoration["click"])
+                .map { convertPointToNavigatorSpace($0.point) }
+            let activatedDecoration = ActivatedDecorationEvent(id: decorationId,
+                                                               group: groupName,
+                                                               frame: frame,
+                                                               point: point)
+            activatedDecorations.append(activatedDecoration)
+        }
+        
+        delegate?.spreadView(self, activatedDecorations: activatedDecorations)
     }
 
     
