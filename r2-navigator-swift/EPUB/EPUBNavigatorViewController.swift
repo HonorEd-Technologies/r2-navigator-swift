@@ -84,7 +84,7 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
         public var debugState: Bool
         
         public var trimmedToc: [Link]?
-
+        
         public init(
             userSettings: UserSettings = UserSettings(),
             editingActions: [EditingAction] = EditingAction.defaultActions,
@@ -209,8 +209,9 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
             }
         }
     }
-    
-    public var onIntersectingRects: (([DOMRect], Int) -> Void)?
+
+    public var onSpreadViewShouldDefaultToWebview: (() -> Bool)?
+    public var onComputedExternalUrlString: ((String) -> Void)?
 
     let config: Configuration
     private let publication: Publication
@@ -697,7 +698,10 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
 }
 
 extension EPUBNavigatorViewController: EPUBSpreadViewDelegate {
-
+    func shouldSpreadViewDefaultToExternalWebView() -> Bool {
+        return self.onSpreadViewShouldDefaultToWebview?() ?? false
+    }
+    
     func spreadViewDidLoad(_ spreadView: EPUBSpreadView) {
         let templates = config.decorationTemplates.reduce(into: [:]) { styles, item in
             styles[item.key.rawValue] = item.value.json
@@ -732,6 +736,18 @@ extension EPUBNavigatorViewController: EPUBSpreadViewDelegate {
                     spreadView.evaluateScript(script, inHREF: href)
                 }
             }
+        }
+        
+        spreadView.onOpenExternalLinkByDefault = { [weak self] url in
+            let path = url.path
+            let components = url.pathComponents
+            let totalComponentsToExclude = components.count - 2
+            let componentsToInclude = components.suffix(totalComponentsToExclude)
+            var externalUrlPath = String(componentsToInclude.joined(separator: "/"))
+            if let fragment = url.fragment {
+                externalUrlPath += "#\(fragment)"
+            }
+            self?.onComputedExternalUrlString?(externalUrlPath)
         }
         
         // SF: HSA-475 Enabling video controls

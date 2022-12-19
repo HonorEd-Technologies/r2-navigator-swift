@@ -40,6 +40,8 @@ protocol EPUBSpreadViewDelegate: AnyObject {
     
     /// Called when the spread view needs to present a view controller.
     func spreadView(_ spreadView: EPUBSpreadView, present viewController: UIViewController)
+    
+    func shouldSpreadViewDefaultToExternalWebView() -> Bool
 }
 
 class EPUBSpreadView: UIView, Loggable, PageView {
@@ -55,6 +57,8 @@ class EPUBSpreadView: UIView, Loggable, PageView {
     let readingProgression: ReadingProgression
     let userSettings: UserSettings
     let editingActions: EditingActionsController
+    
+    var onOpenExternalLinkByDefault: (URL) -> Void = { _ in }
 
     private var lastClick: ClickEvent? = nil
 
@@ -456,9 +460,11 @@ extension EPUBSpreadView: WKNavigationDelegate {
         if navigationAction.navigationType == .linkActivated {
             if let url = navigationAction.request.url {
                 // Check if url is internal or external
-                if let baseURL = publication.baseURL, url.host == baseURL.host {
+                if let baseURL = publication.baseURL, url.host == baseURL.host, delegate?.shouldSpreadViewDefaultToExternalWebView() == false {
                     let href = url.absoluteString.replacingOccurrences(of: baseURL.absoluteString, with: "/")
                     delegate?.spreadView(self, didTapOnInternalLink: href, clickEvent: self.lastClick)
+                } else if let baseURL = publication.baseURL, delegate?.shouldSpreadViewDefaultToExternalWebView() == true && url.host == baseURL.host {
+                    onOpenExternalLinkByDefault(url)
                 } else {
                     delegate?.spreadView(self, didTapOnExternalURL: url)
                 }
