@@ -4192,6 +4192,14 @@ function toNativeRect(rect) {
   const bottom = top + height;
   return { width, height, left, top, right, bottom };
 }
+    
+/**
+ * Checks webview to see if scrolled to end of scrollable content
+ */
+function updateEndOfSpread() {
+    let reachedEndOfSpread = window.scrollY + window.innerHeight >= document.scrollingElement.scrollHeight
+    webkit.messageHandlers.reachedEndOfSpread.postMessage(reachedEndOfSpread)
+}
 
 /**
  * Adjusts the given coordinates to the viewport for FXL resources.
@@ -4241,7 +4249,7 @@ function rectsFromTexts(texts) {
 }
     
 function textFromRect(rect) {
-    let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, strong, figcaption, code, li, dt, td, title, div")).filter((el) => el.innerText && el.innerText.trim() != "")
+    let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, b, figcaption, code, li, dt, td, title, div")).filter((el) => el.innerText && el.innerText.trim() != "")
     const containsRect = (superRect, el) => {
         let frame = el.getBoundingClientRect()
         if (frame.height === 0) { return false }
@@ -4268,7 +4276,7 @@ function textFromRect(rect) {
     
     let containingTextElements = textElements.filter((el) => containsRect(rect, el))
     var texts = containingTextElements.filter((el) => isRectUnique(el)).map((el) => {
-        return el.innerText
+        return el.textContent
     })
     var text = ""
     for (var i = 0; i < texts.length; i++) {
@@ -4416,6 +4424,7 @@ window.readium = {
   selectionText: selectionText,
   rectFromLocatorText: rectFromLocatorText,
   rectsFromLocatorText: rectsFromLocatorText,
+  updateEndOfSpread: updateEndOfSpread
 };
 
 
@@ -5108,6 +5117,8 @@ function update(position) {
     
 function updateOffset(offset) {
     webkit.messageHandlers.offsetChanged.postMessage(offset)
+    let reachedEndOfSpread = window.scrollY + window.innerHeight >= document.scrollingElement.scrollHeight
+    webkit.messageHandlers.reachedEndOfSpread.postMessage(reachedEndOfSpread)
 }
 
 window.addEventListener("scroll", function () {

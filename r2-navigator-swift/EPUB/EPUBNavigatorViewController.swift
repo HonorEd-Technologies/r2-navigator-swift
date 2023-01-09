@@ -115,6 +115,7 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
     public var isAllowingSelection = true
     
     public var onScrollViewDidScroll: ((Double) -> Void)?
+    public var onReachedEndOfSpread: ((Bool) -> Void)?
     
     public var userSettings: UserSettings
 
@@ -990,6 +991,7 @@ extension EPUBNavigatorViewController: PaginationViewDelegate {
         delegate?.navigator(self, setupUserScripts: userContentController)
         
         spreadView.registerJSMessage(named: "offsetChanged", handler: handleOffsetChanged)
+        spreadView.registerJSMessage(named: "reachedEndOfSpread", handler: handleEndOfSpread)
 
         return spreadView
     }
@@ -1000,10 +1002,17 @@ extension EPUBNavigatorViewController: PaginationViewDelegate {
         }
     }
     
+    func handleEndOfSpread(val: Any) {
+        if let reached = val as? Bool {
+            onReachedEndOfSpread?(reached)
+        }
+    }
+    
     func paginationViewDidUpdateViews(_ paginationView: PaginationView) {
         // notice that you should set the delegate before you load views
         // otherwise, when open the publication, you may miss the first invocation
         notifyCurrentLocation()
+        evaluateJavaScript("window.readium.updateEndOfSpread()")
 
         // FIXME: Deprecated, to be removed at some point.
         if let currentResourceIndex = currentResourceIndex {
