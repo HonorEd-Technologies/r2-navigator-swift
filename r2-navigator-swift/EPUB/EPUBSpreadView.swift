@@ -279,7 +279,6 @@ class EPUBSpreadView: UIView, Loggable, PageView {
         }
 
         focusedResource = spread.links.first(withHREF: href)
-        frame.origin = convertPointToNavigatorSpace(frame.origin)
         delegate?.spreadView(self, selectionDidChange: text, frame: frame)
     }
     

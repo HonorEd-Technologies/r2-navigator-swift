@@ -917,18 +917,21 @@ extension EPUBNavigatorViewController: EPUBSpreadViewDelegate {
 
     func spreadView(_ spreadView: EPUBSpreadView, selectionDidChange text: Locator.Text?, frame: CGRect) {
         guard
-            let locator = currentLocation,
+            var locator = currentLocation,
             let text = text
         else {
             editingActions.selection = nil
             return
         }
-        
+        locator = locator.copy(locations: { locations in
+            if spreadView.isScrollEnabled {
+                locations.progression = frame.origin.y/spreadView.scrollView.contentSize.height
+            }
+        }, text: { $0 = text })
         editingActions.selection = Selection(
-            locator: locator.copy(text: { $0 = text }),
+            locator: locator,
             frame: frame
         )
-        
     }
 
     func spreadViewPagesDidChange(_ spreadView: EPUBSpreadView) {
