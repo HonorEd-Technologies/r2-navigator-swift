@@ -367,8 +367,7 @@ final class EPUBReflowableSpreadView: EPUBSpreadView {
 
         // Makes sure we always receive the "ending scroll" event.
         // ie. https://stackoverflow.com/a/1857162/1474476
-        NSObject.cancelPreviousPerformRequests(withTarget: self, selector: #selector(notifyPagesDidChange), object: nil)
-        perform(#selector(notifyPagesDidChange), with: nil, afterDelay: 0.3)
+        notifyPagesDidChange()
     }
 
 }
