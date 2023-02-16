@@ -112,6 +112,7 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
     }
     
     public var onSelection: ((_ selection: Selection) -> Void)?
+    public var onSelectionWithScrollSize: ((_ selection: Selection, _ scrollSize: CGSize) -> Void)?
     public var isAllowingSelection = true
     
     public var onScrollViewDidScroll: ((Double) -> Void)?
@@ -925,7 +926,7 @@ extension EPUBNavigatorViewController: EPUBSpreadViewDelegate {
         }
         locator = locator.copy(locations: { locations in
             if spreadView.isScrollEnabled {
-                locations.progression = frame.origin.y/spreadView.scrollView.contentSize.height
+                locations.progression? += frame.origin.y/spreadView.scrollView.contentSize.height
             }
         }, text: { $0 = text })
         editingActions.selection = Selection(
@@ -956,6 +957,8 @@ extension EPUBNavigatorViewController: EditingActionsControllerDelegate {
 
     func editingActions(_ editingActions: EditingActionsController, shouldShowMenuForSelection selection: Selection) -> Bool {
         onSelection?(selection)
+        let spreadView = paginationView.currentView as? EPUBSpreadView
+        onSelectionWithScrollSize?(selection, spreadView?.scrollView.contentSize ?? CGSize(width: 1.0, height: 1.0))
         return isAllowingSelection
     }
 
