@@ -623,6 +623,17 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
             (pageView as? EPUBSpreadView)?.webView.clearSelection()
         }
     }
+    
+    /// if true user can select text otherwise not
+    private var isTextSelectionEnabled = true
+    /// set the  property `isTextSelectionEnabled`
+    /// update the text selection for the loaded views
+    public func setTextSelection(allow: Bool = true) {
+        for (_, pageView) in paginationView.loadedViews {
+            (pageView as? EPUBSpreadView)?.webView.configuration.preferences.isTextInteractionEnabled = allow
+        }
+        isTextSelectionEnabled = allow
+    }
 
     // MARK: – DecorableNavigator
 
@@ -761,6 +772,7 @@ extension EPUBNavigatorViewController: EPUBSpreadViewDelegate {
         """
         
         spreadView.evaluateScript(videoControlScript)
+        spreadView.webView.configuration.preferences.isTextInteractionEnabled = isTextSelectionEnabled
     }
     
     public func removeAnnotations() {
