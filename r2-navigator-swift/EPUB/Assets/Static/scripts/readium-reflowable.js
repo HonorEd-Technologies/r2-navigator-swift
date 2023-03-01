@@ -4362,6 +4362,12 @@ function rectFromLocatorText(locator) {
     }
 }
     
+function locatorFromRect(rect) {
+    let text = textFromRect(rect);
+    let locator = selectionText(text);
+    return locator;
+}
+    
 function selectionText(totalText) {
     const cleanHighlight = totalText.trim()
         .replace(/\n/g, " ")
@@ -4424,7 +4430,8 @@ window.readium = {
   selectionText: selectionText,
   rectFromLocatorText: rectFromLocatorText,
   rectsFromLocatorText: rectsFromLocatorText,
-  updateEndOfSpread: updateEndOfSpread
+  updateEndOfSpread: updateEndOfSpread,
+  locatorFromRect: locatorFromRect
 };
 
 
