@@ -123,6 +123,12 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
     public var readingProgression: ReadingProgression {
         didSet { updateUserSettingStyle() }
     }
+
+    public var currentSpreadViewScrollSize: CGSize {
+        get {
+            return (paginationView.currentView as? EPUBSpreadView)?.scrollView.contentSize ?? CGSize(width: 1.0, height: 1.0)
+        }
+    }
     
     /// Navigation state.
     private enum State: Equatable {
