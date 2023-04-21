@@ -92,6 +92,11 @@ final class PaginationView: UIView, Loggable {
         return loadedViews[currentIndex]
     }
     
+    var currentViewContentHeight: CGFloat? {
+        guard let spreadView = currentView as? EPUBSpreadView else { return nil }
+        return spreadView.webView.scrollView.contentSize.height
+    }
+    
     /// Loaded page views in reading order.
     private var orderedViews: [UIView & PageView] {
         var orderedViews = loadedViews
