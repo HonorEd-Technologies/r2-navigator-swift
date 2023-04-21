@@ -4062,15 +4062,15 @@ function onClick(event) {
     targetElement: event.target.outerHTML,
     interactiveElement: nearestInteractiveElement(event.target),
   };
+    
+    // Send the tap data over the JS bridge even if it's been handled
+    // within the webview, so that it can be preserved and used
+    // by the WKNavigationDelegate if needed.
+    webkit.messageHandlers.tap.postMessage(clickEvent);
 
   if ((0,_decorator__WEBPACK_IMPORTED_MODULE_0__.handleDecorationClickEvent)(event, clickEvent)) {
-    return;
+    // NO OP
   }
-
-  // Send the tap data over the JS bridge even if it's been handled
-  // within the webview, so that it can be preserved and used
-  // by the WKNavigationDelegate if needed.
-  webkit.messageHandlers.tap.postMessage(clickEvent);
 
   // We don't want to disable the default WebView behavior as it breaks some features without bringing any value.
   // event.stopPropagation();
@@ -4137,7 +4137,21 @@ __webpack_require__.r(__webpack_exports__);
 
 // Base script used by both reflowable and fixed layout resources.
 
-
+function initializeAccessibility(doubleTapLabel, energyBarLabel) {
+    let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, b, figcaption, code, li, dt, td, title")).filter((el) => el.innerText && el.innerText.trim() != "")
+    textElements.forEach((el) => {
+        var text = el.innerText.trim()
+        if (doubleTapLabel) {
+            text += `, ${doubleTapLabel}`
+        }
+        if (energyBarLabel) {
+            text += `, ${energyBarLabel}`
+        }
+        
+        el.setAttribute("role", "button")
+        el.setAttribute("aria-label", text)
+    })
+}
 
 function initializeIntersectionObserver() {
     const callback = (elements, observer) => {
@@ -4246,6 +4260,31 @@ function rectsFromTexts(texts) {
             intersectionRatio: text.intersectionRatio
         }
     }).filter((rect) => rect)
+}
+    
+function rectFromPoint(point) {
+    let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, b, figcaption, code, li, dt, td, title, div")).filter((el) => el.innerText && el.innerText.trim() != "")
+    const containsPoint = (el) => {
+        let frame = el.getBoundingClientRect()
+        if (frame.height === 0) { return false }
+        if (frame.x < point.x && frame.x + frame.width > point.x && frame.y < point.y && frame.y + frame.height > point.y) {
+            return true
+        }
+        return false
+    }
+    
+    let containingTextElements = textElements.filter((el) => containsPoint(el))
+    let smallestContainingTextElement = containingTextElements.reduce((prev, current) => prev.height < current.height ? prev : current)
+    if (!smallestContainingTextElement) {
+        return
+    }
+    let elementFrame = smallestContainingTextElement.getBoundingClientRect()
+    return {
+        x: elementFrame.x,
+        y: elementFrame.y,
+        width: elementFrame.width,
+        height: elementFrame.height
+    }
 }
     
 function textFromRect(rect) {
@@ -4425,13 +4464,14 @@ window.readium = {
   registerDecorationTemplates: _decorator__WEBPACK_IMPORTED_MODULE_2__.registerTemplates,
   getDecorations: _decorator__WEBPACK_IMPORTED_MODULE_2__.getDecorations,
   initializeIntersectionObserver: initializeIntersectionObserver,
+  initializeAccessibility: initializeAccessibility,
   rectsFromTexts: rectsFromTexts,
   textFromRect: textFromRect,
+  rectFromPoint: rectFromPoint,
   selectionText: selectionText,
   rectFromLocatorText: rectFromLocatorText,
   rectsFromLocatorText: rectsFromLocatorText,
-  updateEndOfSpread: updateEndOfSpread,
-  locatorFromRect: locatorFromRect
+  updateEndOfSpread: updateEndOfSpread
 };
 
 
@@ -5196,7 +5236,7 @@ function scrollToId(id) {
     return false;
   }
 
-  scrollToRect(element.getBoundingClientRect(), false);
+  scrollToRect(element.getBoundingClientRect());
   return true;
 }
 
@@ -5234,17 +5274,13 @@ function scrollToText(text) {
 }
 
 function scrollToRange(range) {
-  scrollToRect(range.getBoundingClientRect(), true);
+  scrollToRect(range.getBoundingClientRect());
 }
 
-function scrollToRect(rect, verticallyCenter) {
+function scrollToRect(rect) {
   if (isScrollModeEnabled()) {
-      if (verticallyCenter) {
-          document.scrollingElement.scrollTop = rect.top + window.scrollY - window.innerHeight / 2;
-      }
-      else {
-          document.scrollingElement.scrollTop = rect.top + window.scrollY;
-      }
+    document.scrollingElement.scrollTop =
+      rect.top + window.scrollY - window.innerHeight / 2;
   } else {
     document.scrollingElement.scrollLeft = snapOffset(
       rect.left + window.scrollX

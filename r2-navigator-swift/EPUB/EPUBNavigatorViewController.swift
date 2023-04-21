@@ -83,6 +83,8 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
         /// Logs the state changes when true.
         public var debugState: Bool
         
+        public var longPressAccessibilityLabel: String?
+        
         public var trimmedToc: [Link]?
         
         public init(
@@ -117,17 +119,16 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
     
     public var onScrollViewDidScroll: ((Double) -> Void)?
     public var onReachedEndOfSpread: ((Bool) -> Void)?
+    var onSpreadDidLoad: ((EPUBSpreadView) -> Void)?
     
     public var userSettings: UserSettings
 
     public var readingProgression: ReadingProgression {
         didSet { updateUserSettingStyle() }
     }
-
-    public var currentSpreadViewScrollSize: CGSize {
-        get {
-            return (paginationView.currentView as? EPUBSpreadView)?.scrollView.contentSize ?? CGSize(width: 1.0, height: 1.0)
-        }
+    
+    public var contentSizeHeight: CGFloat? {
+        paginationView.currentViewContentHeight
     }
     
     /// Navigation state.
@@ -266,6 +267,9 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
 
         super.init(nibName: nil, bundle: nil)
         
+        if let longPress = config.longPressAccessibilityLabel {
+            self.onSpreadDidLoad = initializeAccessibility(longPressLabel: longPress)
+        }
         self.editingActions.delegate = self
         self.paginationView.delegate = self
     }
@@ -778,7 +782,7 @@ extension EPUBNavigatorViewController: EPUBSpreadViewDelegate {
         """
         
         spreadView.evaluateScript(videoControlScript)
-        spreadView.webView.configuration.preferences.isTextInteractionEnabled = isTextSelectionEnabled
+        onSpreadDidLoad?(spreadView)
     }
     
     public func removeAnnotations() {
@@ -965,6 +969,14 @@ extension EPUBNavigatorViewController: EPUBSpreadViewDelegate {
 
 }
 
+extension EPUBNavigatorViewController {
+    func initializeAccessibility(longPressLabel: String) -> (EPUBSpreadView) -> Void {
+        return { spreadView in
+            spreadView.evaluateScript("window.readium.initializeAccessibility(\"\(longPressLabel)\", undefined)")
+        }
+    }
+}
+
 extension EPUBNavigatorViewController: EditingActionsControllerDelegate {
     
     func editingActionsDidPreventCopy(_ editingActions: EditingActionsController) {
@@ -975,8 +987,6 @@ extension EPUBNavigatorViewController: EditingActionsControllerDelegate {
 
     func editingActions(_ editingActions: EditingActionsController, shouldShowMenuForSelection selection: Selection) -> Bool {
         onSelection?(selection)
-        let spreadView = paginationView.currentView as? EPUBSpreadView
-        onSelectionWithScrollSize?(selection, spreadView?.scrollView.contentSize ?? CGSize(width: 1.0, height: 1.0))
         return isAllowingSelection
     }
 
@@ -1013,6 +1023,10 @@ extension EPUBNavigatorViewController: PaginationViewDelegate {
 
         let userContentController = spreadView.webView.configuration.userContentController
         delegate?.navigator(self, setupUserScripts: userContentController)
+
+        if #available(iOS 14.5, *) {
+            spreadView.webView.configuration.preferences.isTextInteractionEnabled = !config.editingActions.isEmpty
+        }
         
         spreadView.registerJSMessage(named: "offsetChanged", handler: handleOffsetChanged)
         spreadView.registerJSMessage(named: "reachedEndOfSpread", handler: handleEndOfSpread)

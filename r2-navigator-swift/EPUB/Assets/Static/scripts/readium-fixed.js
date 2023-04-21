@@ -4868,7 +4868,7 @@ function scrollToId(id) {
     return false;
   }
 
-  scrollToRect(element.getBoundingClientRect(), false);
+  scrollToRect(element.getBoundingClientRect());
   return true;
 }
 
@@ -4906,17 +4906,13 @@ function scrollToText(text) {
 }
 
 function scrollToRange(range) {
-  scrollToRect(range.getBoundingClientRect(), true);
+  scrollToRect(range.getBoundingClientRect());
 }
 
-function scrollToRect(rect, verticallyCenter) {
+function scrollToRect(rect) {
   if (isScrollModeEnabled()) {
-      if (verticallyCenter) {
-          document.scrollingElement.scrollTop = rect.top + window.scrollY - window.innerHeight / 2;
-      }
-      else {
-          document.scrollingElement.scrollTop = rect.top + window.scrollY;
-      }
+    document.scrollingElement.scrollTop =
+      rect.top + window.scrollY - window.innerHeight / 2;
   } else {
     document.scrollingElement.scrollLeft = snapOffset(
       rect.left + window.scrollX
