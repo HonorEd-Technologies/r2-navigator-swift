@@ -127,6 +127,12 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
         didSet { updateUserSettingStyle() }
     }
     
+    public var currentSpreadViewScrollSize: CGSize {
+        get {
+            return (paginationView.currentView as? EPUBSpreadView)?.scrollView.contentSize ?? CGSize(width: 1.0, height: 1.0)
+        }
+    }
+    
     public var contentSizeHeight: CGFloat? {
         paginationView.currentViewContentHeight
     }
@@ -987,6 +993,8 @@ extension EPUBNavigatorViewController: EditingActionsControllerDelegate {
 
     func editingActions(_ editingActions: EditingActionsController, shouldShowMenuForSelection selection: Selection) -> Bool {
         onSelection?(selection)
+        let spreadView = paginationView.currentView as? EPUBSpreadView
+        onSelectionWithScrollSize?(selection, spreadView?.scrollView.contentSize ?? CGSize(width: 1.0, height: 1.0))
         return isAllowingSelection
     }
 
