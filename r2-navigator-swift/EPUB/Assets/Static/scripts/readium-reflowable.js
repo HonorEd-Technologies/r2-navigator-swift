@@ -4471,7 +4471,8 @@ window.readium = {
   selectionText: selectionText,
   rectFromLocatorText: rectFromLocatorText,
   rectsFromLocatorText: rectsFromLocatorText,
-  updateEndOfSpread: updateEndOfSpread
+  updateEndOfSpread: updateEndOfSpread,
+  locatorFromRect: locatorFromRect
 };
 
 
