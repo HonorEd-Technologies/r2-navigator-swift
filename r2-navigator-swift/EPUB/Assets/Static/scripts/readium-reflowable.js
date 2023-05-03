@@ -4346,7 +4346,7 @@ function textFromRect(rect) {
     }
     while (shouldContinueTrimmingAbove(range)) {
         let nextWordIndex = text.indexOf(" ")
-        if (!nextWordIndex) {
+        if (!nextWordIndex || nextWordIndex === -1) {
             break
         }
         text = text.slice(nextWordIndex + 1)
@@ -4363,7 +4363,7 @@ function textFromRect(rect) {
     
     while (shouldContinueTrimmingBelow(range)) {
         let nextWordIndex = text.lastIndexOf(" ")
-        if (!nextWordIndex) {
+        if (!nextWordIndex || nextWordIndex === -1) {
             break
         }
         text = text.slice(0, nextWordIndex)
@@ -4377,7 +4377,9 @@ function textFromRect(rect) {
         if (!newRange || newRange.collapsed) continue
         range = newRange
     }
-    return text
+    let boundingRect = range.getBoundingClientRect();
+    let isContaining = boundingRect.y >= rect.y && boundingRect.y + boundingRect.height <= rect.y + rect.height;
+    return isContaining ? text : "";
 }
     
 function rectsFromLocatorText(locators) {
