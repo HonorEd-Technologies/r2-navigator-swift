@@ -1033,7 +1033,7 @@ extension EPUBNavigatorViewController: PaginationViewDelegate {
         delegate?.navigator(self, setupUserScripts: userContentController)
 
         if #available(iOS 14.5, *) {
-            spreadView.webView.configuration.preferences.isTextInteractionEnabled = !config.editingActions.isEmpty
+            spreadView.webView.configuration.preferences.isTextInteractionEnabled = !config.editingActions.isEmpty && isTextSelectionEnabled
         }
         
         spreadView.registerJSMessage(named: "offsetChanged", handler: handleOffsetChanged)
