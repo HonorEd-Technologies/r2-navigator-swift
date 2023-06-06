@@ -517,7 +517,9 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
         
         let link = spreadView.focusedResource ?? spreadView.spread.leading
         let href = link.href
-        let progression = spreadView.progression(in: href)
+        // There are some cases when the progression might come as a negative value, in order to avoid the app to crash we set the value to 0
+        var progression = spreadView.progression(in: href)
+        progression = progression > 0 ? progression : 0
         
         guard let currentLocation = currentLocation,
               let trimmedToc = config.trimmedToc,
@@ -544,7 +546,9 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
         
         let link = spreadView.focusedResource ?? spreadView.spread.leading
         let href = link.href
-        let progression = spreadView.progression(in: href)
+        // There are some cases when the progression might come as a negative value, in order to avoid the app to crash we set the value to 0
+        var progression = spreadView.progression(in: href)
+        progression = progression > 0 ? progression : 0
         
         // The positions are not always available, for example a Readium WebPub doesn't have any
         // unless a Publication Positions Web Service is provided.
