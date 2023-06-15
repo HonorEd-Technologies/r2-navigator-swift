@@ -4137,8 +4137,10 @@ __webpack_require__.r(__webpack_exports__);
 
 // Base script used by both reflowable and fixed layout resources.
 
+    let userReactionsAccessibleArray = [];
+    
 function initializeAccessibility(doubleTapLabel, energyBarLabel) {
-    let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, b, figcaption, code, li, dt, td, title")).filter((el) => el.innerText && el.innerText.trim() != "")
+    let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, b, figcaption, code, li, dt, td, title, image, img")).filter((el) => el.innerText && el.innerText.trim() != "")
     textElements.forEach((el) => {
         var text = el.innerText.trim()
         if (doubleTapLabel) {
@@ -4153,6 +4155,188 @@ function initializeAccessibility(doubleTapLabel, energyBarLabel) {
     })
 }
 
+    function setAccessibility(enabled) {
+        let enabledValue = (enabled === "true");
+        let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, b, figcaption, code, li, dt, td, title, image, img, div"))
+        textElements.forEach((el) => {
+            el.setAttribute("aria-hidden", !enabledValue)
+        })
+    }
+
+    function elementIsWithinRect(superRect, el) {
+        let frame = el.getBoundingClientRect()
+        if (frame.height === 0) { return false }
+        let isFullyContained = superRect.y < frame.y && superRect.y + superRect.height > frame.y + frame.height
+        let isContaining = superRect.y > frame.y && superRect.y + superRect.height < frame.y + frame.height
+        return isFullyContained || isContaining
+    }
+
+    // Assigns an Aria-Label to the element. If there is already aria label there, then it will update or add the one
+    function updateArialLabel(element, ariaLabel) {
+      var text = element.innerText.trim()
+      const currentArialLabel = element.getAttribute("aria-label")
+      if (currentArialLabel) {
+          let foundAriaLabel = currentArialLabel.includes(ariaLabel)
+          if (!foundAriaLabel) {
+              text = `${ariaLabel}` + currentArialLabel
+          } else {
+              text = currentArialLabel
+          }
+      } else {
+          text = `${ariaLabel}` + text
+      }
+
+      element.setAttribute("role", "button")
+      element.setAttribute("aria-label", text)
+    }
+
+    // Removes an Aria-Label from the element
+    function removeArialLabel(element, ariaLabel) {
+      var text = element.innerText.trim()
+      const currentArialLabel = element.getAttribute("aria-label")
+      if (currentArialLabel) {
+          let foundAriaLabel = currentArialLabel.includes(ariaLabel)
+          if (foundAriaLabel) {
+              text = currentArialLabel.replace(`${ariaLabel}`,'')
+          } else {
+              text = currentArialLabel
+          }
+
+          element.setAttribute("aria-label", text)
+      }
+    }
+
+    function rectanglesIntersect(rectangle1, rectangle2) {
+      const x1 = rectangle1.x;
+      const y1 = rectangle1.y;
+      const width1 = rectangle1.width;
+      const height1 = rectangle1.height;
+
+      const x2 = rectangle2.x;
+      const y2 = rectangle2.y;
+      const width2 = rectangle2.width;
+      const height2 = rectangle2.height;
+
+      // Check for intersection
+      if (
+        x1 < x2 + width2 &&
+        x1 + width1 > x2 &&
+        y1 < y2 + height2 &&
+        y1 + height1 > y2
+      ) {
+        return true;
+      } else {
+        return false;
+      }
+    }
+    
+    function elementWithLocatorIsWithinRect(superRect, el) {
+        let frame = el.getBoundingClientRect()
+        if (frame.height === 0) { return false }
+        
+        let elementRect = {
+            x: frame.x,
+            y: frame.y,
+            width: frame.width,
+            height: frame.height
+        }
+        
+        let padding = 5
+        let locatorRect = {
+            x: superRect.x - padding,
+            y: superRect.y - padding,
+            width: superRect.width - padding,
+            height: superRect.height - padding
+        }
+
+        let resultIntersect = rectanglesIntersect(elementRect, locatorRect)
+        return resultIntersect
+    }
+
+    function textElementList() {
+        let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, b, figcaption, code, li, dt, td, title, image, img")).filter((el) => el.innerText && el.innerText.trim() != "");
+        return textElements
+    }
+    
+    // Adds aria attributes when Shared annotations are present, by using a locator that will be sent from the native code
+    function addAccessibilityEnergyBar(locators, sharedAnnotationsLabel) {
+        let textElements = textElementList()
+        
+        for (let i = 0; i < locators.length ; i++) {
+            try {
+                let locator = locators[i]
+                let foundRect = rectFromLocatorText(locator)
+                if (!foundRect) {
+                    console.log("addAccessibilityEnergyBar - > foundRect not found");
+                    continue;
+                }
+                
+                const href = readium.link.href;
+                if (href == locator.href) {
+                    let containingTextElements = textElements.filter((el) => elementWithLocatorIsWithinRect(foundRect, el))
+                    containingTextElements.forEach((el) => {
+                        updateArialLabel(el, sharedAnnotationsLabel)
+                    })
+                }
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        return true
+    }
+    
+    // Removes all the aria attributes when Shared annotations are disabled
+    function removeAccessibilityEnergyBar(sharedAnnotationsLabel) {
+        let textElements = textElementList()
+        textElements.forEach((el) => {
+            removeArialLabel(el, sharedAnnotationsLabel)
+        })
+
+        return true
+    }
+    
+    // Remove all current accessible labels
+    function removeCurrentAccessibility() {
+        for (let i = 0; i < userReactionsAccessibleArray.length; i++) {
+          const elementAccessible = userReactionsAccessibleArray[i];
+            removeArialLabel(elementAccessible.element, elementAccessible.label)
+        }
+        
+        userReactionsAccessibleArray = [];
+    }
+    
+    // Adds aria attributes when user annotations are present, by using a locator that will be sent from the native code
+    function addAccessibilityUserAnnotation(locators, labels) {
+        removeCurrentAccessibility()
+        let textElements = textElementList()
+        for (let i = 0; i < locators.length ; i++) {
+            try {
+                let locator = locators[i]
+                let userAnnotationLabel = labels[i]
+                let foundRect = rectFromLocatorText(locator)
+                if (!foundRect) {
+                    console.log("addAccessibilityUserAnnotation - > foundRect not found");
+                    continue;
+                }
+                
+                const href = readium.link.href;
+                if (href == locator.href) {
+                    let containingTextElements = textElements.filter((el) => elementWithLocatorIsWithinRect(foundRect, el))
+                    containingTextElements.forEach((el) => {
+                        const elementAccessible = { element: el, label: userAnnotationLabel}
+                        userReactionsAccessibleArray.push(elementAccessible);
+                        updateArialLabel(el, userAnnotationLabel)
+                    })
+                }
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        return true
+    }
+    
 function initializeIntersectionObserver() {
     const callback = (elements, observer) => {
         var intersectingRects = []
@@ -4467,6 +4651,7 @@ window.readium = {
   getDecorations: _decorator__WEBPACK_IMPORTED_MODULE_2__.getDecorations,
   initializeIntersectionObserver: initializeIntersectionObserver,
   initializeAccessibility: initializeAccessibility,
+setAccessibility: setAccessibility,
   rectsFromTexts: rectsFromTexts,
   textFromRect: textFromRect,
   rectFromPoint: rectFromPoint,
@@ -4474,7 +4659,10 @@ window.readium = {
   rectFromLocatorText: rectFromLocatorText,
   rectsFromLocatorText: rectsFromLocatorText,
   updateEndOfSpread: updateEndOfSpread,
-  locatorFromRect: locatorFromRect
+  locatorFromRect: locatorFromRect,
+  addAccessibilityEnergyBar: addAccessibilityEnergyBar,
+  addAccessibilityUserAnnotation: addAccessibilityUserAnnotation,
+  removeAccessibilityEnergyBar: removeAccessibilityEnergyBar  
 };
 
 

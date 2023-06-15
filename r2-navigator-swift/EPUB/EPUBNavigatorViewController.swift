@@ -46,6 +46,8 @@ public extension EPUBNavigatorDelegate {
 
 public typealias EPUBContentInsets = (top: CGFloat, bottom: CGFloat)
 
+public typealias ScriptToExecute = (name: String, script: String)
+
 open class EPUBNavigatorViewController: UIViewController, VisualNavigator, SelectableNavigator, DecorableNavigator, Loggable {
 
     public enum EPUBError: Error {
@@ -120,7 +122,13 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
     public var onScrollViewDidScroll: ((Double) -> Void)?
     public var onReachedEndOfSpread: ((Bool) -> Void)?
     var onSpreadDidLoad: ((EPUBSpreadView) -> Void)?
+    var spreadViewDidLoad: ((EPUBSpreadView) -> Void)?
     
+    /// Keeps an array with the JS scripts that will be executed manually or automatically when the spreadViews are being loaded
+    private var scriptsToExecute: [ScriptToExecute] = []
+
+    public var onScriptAppliedError: ((Error) -> Void)?
+
     public var userSettings: UserSettings
 
     public var readingProgression: ReadingProgression {
@@ -273,9 +281,7 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
 
         super.init(nibName: nil, bundle: nil)
         
-        if let longPress = config.longPressAccessibilityLabel {
-            self.onSpreadDidLoad = initializeAccessibility(longPressLabel: longPress)
-        }
+        self.onSpreadDidLoad = handleSpreadLoad(config: config)
         self.editingActions.delegate = self
         self.paginationView.delegate = self
     }
@@ -728,6 +734,32 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
         }
         spreadView.evaluateScript(script, completion: completion)
     }
+    
+    /// This adds or updates a script as part of the scripts that will be executed on the ePub document
+    /// Usually this scripts are being used to handle accessibility support for the ePub
+    /// - Parameter script: The script what will be added / updated
+    public func setScriptToExecute(_ script: ScriptToExecute) {
+        if let foundIndex = self.scriptsToExecute.firstIndex(where: { $0.name == script.name }) {
+            self.scriptsToExecute[foundIndex] = script
+            return
+        }
+        
+        self.scriptsToExecute.append(script)
+    }
+    
+    /// Removes a script from the list of scripts that eventually will be executed into the ePub
+    /// - Parameter name: The name of the scripts
+    public func removeScriptToExecute(name: String) {
+        guard let foundIndex = self.scriptsToExecute.firstIndex(where: { $0.name == name }) else { return }
+        self.scriptsToExecute.remove(at: foundIndex)
+    }
+        
+    /// Returns whether or not a script is present in the list of scripts that will be executed
+    /// - Parameter name: The name of the script
+    /// - Returns: If the script was found or not
+    public func scriptIsAlreadySet(name: String) -> Bool {
+        return self.scriptsToExecute.firstIndex(where: { $0.name == name }) != nil
+    }
 }
 
 extension EPUBNavigatorViewController: EPUBSpreadViewDelegate {
@@ -980,9 +1012,62 @@ extension EPUBNavigatorViewController: EPUBSpreadViewDelegate {
 }
 
 extension EPUBNavigatorViewController {
-    func initializeAccessibility(longPressLabel: String) -> (EPUBSpreadView) -> Void {
-        return { spreadView in
-            spreadView.evaluateScript("window.readium.initializeAccessibility(\"\(longPressLabel)\", undefined)")
+
+    public var currentSpreadIsLoaded: Bool {
+        guard let currentSpread = paginationView.currentView as? EPUBSpreadView else {
+            return false
+        }
+        
+        return currentSpread.spreadLoaded
+    }
+
+    func isSpreadVisible(_ spreadView: EPUBSpreadView) -> Bool {
+        guard let current = paginationView.currentView else {
+            return false
+        }
+        
+        return current == spreadView
+    }
+    
+    func handleSpreadLoad(config: Configuration) -> (EPUBSpreadView) -> Void {
+        return { [weak self] spreadView in
+            guard let self else { return }
+            if let longPress = config.longPressAccessibilityLabel {
+                spreadView.evaluateScript("window.readium.initializeAccessibility(\"\(longPress)\", undefined)")
+            }
+
+            self.applyScripts(spreadView: spreadView)
+            if self.isSpreadVisible(spreadView) {
+                self.spreadViewDidLoad?(spreadView)
+            }
+        }
+    }
+    
+    /// Evaluates and applies the current script list into the ePub document
+    /// In this case as we don't know what is current spreadView, we just send the parameter nil,
+    /// and the internal 'applyScripts' will apply the script to the current displayed spreadView
+    public func applyScripts() {
+        self.applyScripts(spreadView: nil)
+    }
+    
+    /// Evaluates and applies the current script list into the ePub document
+    /// - Parameter spreadView: The spreadView where the script is going to run. If the value is nil, then script will be evaluated on the current visible spreadView
+    private func applyScripts(spreadView: EPUBSpreadView?) {
+        let resultHandler: (Result<Any, Error>) -> Void = { [weak self] result in
+            switch result {
+            case .failure(let error):
+                self?.onScriptAppliedError?(error)
+            case .success:
+                break
+            }
+        }
+
+        for script in self.scriptsToExecute {
+            if let spreadView {
+                spreadView.evaluateScript(script.script, completion: resultHandler)
+            } else {
+                self.evaluateJavaScript(script.script, completion: resultHandler)
+            }
         }
     }
 }
