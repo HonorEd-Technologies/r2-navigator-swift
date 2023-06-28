@@ -3628,6 +3628,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "registerTemplates": () => (/* binding */ registerTemplates),
 /* harmony export */   "getDecorations": () => (/* binding */ getDecorations),
 /* harmony export */   "handleDecorationClickEvent": () => (/* binding */ handleDecorationClickEvent),
+/* harmony export */   "activateDecoration": () => (/* binding */ activateDecoration),
 /* harmony export */   "DecorationGroup": () => (/* binding */ DecorationGroup)
 /* harmony export */ });
 /* harmony import */ var _rect__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./rect */ "./src/rect.js");
@@ -3767,6 +3768,41 @@ function handleDecorationClickEvent(event, clickEvent) {
     return true;
 }
 
+function activateDecoration(locator, groupName) {
+    var selectedGroup = undefined
+    for (const [group, groupContent] of groups) {
+        if (!groupContent.isActivable()) {
+            continue;
+        }
+        if (group === groupName) {
+            selectedGroup = groupContent
+        }
+    }
+
+    if (!selectedGroup) {
+        return
+    }
+
+    const itemCount = selectedGroup.items.length
+
+    for (var i = 0; i < itemCount; i++) {
+        const item = selectedGroup.items[i]
+        if (locator.text.highlight === item.decoration.locator.text.highlight) {
+            const boundingRect = (0,_rect__WEBPACK_IMPORTED_MODULE_0__.toNativeRect)(item.range.getBoundingClientRect())
+            webkit.messageHandlers.decorationActivated.postMessage([{
+                id: item.decoration.id,
+                group: groupName,
+                rect: boundingRect,
+                click: {
+                    x: boundingRect.x,
+                    y: boundingRect.y + boundingRect.height / 2
+                }
+            }])
+            return
+        }
+    }
+}
+    
 /**
  * Creates a DecorationGroup object from a unique HTML ID and its name.
  */
@@ -4662,7 +4698,8 @@ setAccessibility: setAccessibility,
   locatorFromRect: locatorFromRect,
   addAccessibilityEnergyBar: addAccessibilityEnergyBar,
   addAccessibilityUserAnnotation: addAccessibilityUserAnnotation,
-  removeAccessibilityEnergyBar: removeAccessibilityEnergyBar  
+  removeAccessibilityEnergyBar: removeAccessibilityEnergyBar,
+  activateDecoration: _decorator__WEBPACK_IMPORTED_MODULE_2__.activateDecoration
 };
 
 
