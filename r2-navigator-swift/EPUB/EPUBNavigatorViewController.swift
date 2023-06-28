@@ -838,6 +838,26 @@ extension EPUBNavigatorViewController: EPUBSpreadViewDelegate {
             apply(decorations: [], in: name)
         }
     }
+    
+    public func openAnnotationAt(locator: Locator, groupName: String) {
+        execute(when: { [weak self] in
+            self?.state == .idle
+        }, pollingInterval: 0.5, {
+            guard let locatorJson = serializeJSONString(locator.json) else { return }
+            self.evaluateJavaScript(
+                    """
+                    window.readium.activateDecoration(\(locatorJson), "\(groupName)");
+                    """
+                    , completion: { result in
+                        switch result {
+                        case .failure(let err):
+                            print(err)
+                        default:
+                            break
+                        }
+                    })
+        })()
+    }
 
     func spreadView(_ spreadView: EPUBSpreadView, didTapAt point: CGPoint) {
         // We allow taps in any state, because we should always be able to toggle the navigation bar,
