@@ -136,6 +136,9 @@ class EPUBSpreadView: UIView, Loggable, PageView {
         webView.navigationDelegate = self
         webView.uiDelegate = self
         scrollView.delegate = self
+        if webView.responds(to: Selector(("setInspectable:"))) {
+            webView.perform(Selector(("setInspectable:")), with: true)
+        }
     }
 
     @available(*, unavailable)
