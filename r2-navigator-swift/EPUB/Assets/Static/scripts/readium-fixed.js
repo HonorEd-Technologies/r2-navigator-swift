@@ -3628,6 +3628,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */   "registerTemplates": () => (/* binding */ registerTemplates),
 /* harmony export */   "getDecorations": () => (/* binding */ getDecorations),
 /* harmony export */   "handleDecorationClickEvent": () => (/* binding */ handleDecorationClickEvent),
+/* harmony export */   "activateDecoration": () => (/* binding */ activateDecoration),
 /* harmony export */   "DecorationGroup": () => (/* binding */ DecorationGroup)
 /* harmony export */ });
 /* harmony import */ var _rect__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./rect */ "./src/rect.js");
@@ -3685,6 +3686,29 @@ function getDecorations(groupName) {
   return group;
 }
 
+    function groupExistsInTargets(group, targets) {
+        for (var i = 0; i < targets.length; i++) {
+            let target = targets[i];
+            if (target.group == group) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    
+    function groupExistsInTargets(group, targets) {
+        for (var i = 0; i < targets.length; i++) {
+            let target = targets[i];
+            if (target.group == group) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+    
 /**
  * Handles click events on a Decoration.
  * Returns whether a decoration matched this event.
@@ -3694,39 +3718,91 @@ function handleDecorationClickEvent(event, clickEvent) {
     return false;
   }
 
-  function findTarget() {
-    for (const [group, groupContent] of groups) {
-      if (!groupContent.isActivable()) {
-        continue;
-      }
-
-      for (const item of groupContent.items.reverse()) {
-        if (!item.clickableElements) {
-          continue;
+    function findTargets() {
+        var targetsFound = new Array();
+        for (const [group, groupContent] of groups) {
+            if (!groupContent.isActivable()) {
+                continue;
+            }
+            
+            for (const item of groupContent.items.reverse()) {
+                if (!item.clickableElements) {
+                    continue;
+                }
+                for (const element of item.clickableElements) {
+                    let rect = element.getBoundingClientRect().toJSON();
+                    if ((0,_rect__WEBPACK_IMPORTED_MODULE_0__.rectContainsPoint)(rect, event.clientX, event.clientY, 1)) {
+                       if (groupExistsInTargets(group, targetsFound)) {
+                            continue;
+                        }
+                        
+                        targetsFound.push({ group, item, element, rect });
+                    }
+                }
+            }
         }
-        for (const element of item.clickableElements) {
-          let rect = element.getBoundingClientRect().toJSON();
-          if ((0,_rect__WEBPACK_IMPORTED_MODULE_0__.rectContainsPoint)(rect, event.clientX, event.clientY, 1)) {
-            return { group, item, element, rect };
-          }
-        }
-      }
+        
+        return targetsFound;
     }
-  }
 
-  let target = findTarget();
-  if (!target) {
+  let targets = findTargets();
+  if (!targets) {
     return false;
   }
-  webkit.messageHandlers.decorationActivated.postMessage({
-    id: target.item.decoration.id,
-    group: target.group,
-    rect: (0,_rect__WEBPACK_IMPORTED_MODULE_0__.toNativeRect)(target.item.range.getBoundingClientRect()),
-    click: clickEvent,
-  });
-  return true;
+    var returningArray = new Array();
+    var targetsLength = targets.length;
+    for (var i = 0; i < targetsLength; i++) {
+        let target = targets[i];
+        
+        returningArray.push(
+                          {
+                            id: target.item.decoration.id,
+                            group: target.group,
+                            rect: (0,_rect__WEBPACK_IMPORTED_MODULE_0__.toNativeRect)(target.item.range.getBoundingClientRect()),
+                            click: clickEvent,
+                          }
+                          );
+    }
+    
+    webkit.messageHandlers.decorationActivated.postMessage(returningArray);
+    return true;
 }
 
+function activateDecoration(locator, groupName) {
+    var selectedGroup = undefined
+    for (const [group, groupContent] of groups) {
+        if (!groupContent.isActivable()) {
+            continue;
+        }
+        if (group === groupName) {
+            selectedGroup = groupContent
+        }
+    }
+
+    if (!selectedGroup) {
+        return
+    }
+
+    const itemCount = selectedGroup.items.length
+
+    for (var i = 0; i < itemCount; i++) {
+        const item = selectedGroup.items[i]
+        if (locator.text.highlight === item.decoration.locator.text.highlight) {
+            const boundingRect = (0,_rect__WEBPACK_IMPORTED_MODULE_0__.toNativeRect)(item.range.getBoundingClientRect())
+            webkit.messageHandlers.decorationActivated.postMessage([{
+                id: item.decoration.id,
+                group: groupName,
+                rect: boundingRect,
+                click: {
+                    x: boundingRect.x,
+                    y: boundingRect.y + boundingRect.height / 2
+                }
+            }])
+            return
+        }
+    }
+}
+    
 /**
  * Creates a DecorationGroup object from a unique HTML ID and its name.
  */
@@ -4022,15 +4098,15 @@ function onClick(event) {
     targetElement: event.target.outerHTML,
     interactiveElement: nearestInteractiveElement(event.target),
   };
+    
+    // Send the tap data over the JS bridge even if it's been handled
+    // within the webview, so that it can be preserved and used
+    // by the WKNavigationDelegate if needed.
+    webkit.messageHandlers.tap.postMessage(clickEvent);
 
   if ((0,_decorator__WEBPACK_IMPORTED_MODULE_0__.handleDecorationClickEvent)(event, clickEvent)) {
-    return;
+    // NO OP
   }
-
-  // Send the tap data over the JS bridge even if it's been handled
-  // within the webview, so that it can be preserved and used
-  // by the WKNavigationDelegate if needed.
-  webkit.messageHandlers.tap.postMessage(clickEvent);
 
   // We don't want to disable the default WebView behavior as it breaks some features without bringing any value.
   // event.stopPropagation();
@@ -4087,6 +4163,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _gestures__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./gestures */ "./src/gestures.js");
 /* harmony import */ var _utils__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./utils */ "./src/utils.js");
 /* harmony import */ var _decorator__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./decorator */ "./src/decorator.js");
+/* harmony import */ var _vendor_hypothesis_anchoring_text_range__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./vendor/hypothesis/anchoring/text-range */ "./src/vendor/hypothesis/anchoring/text-range.js");
+/* harmony import */ var _vendor_hypothesis_anchoring_types__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./vendor/hypothesis/anchoring/types */ "./src/vendor/hypothesis/anchoring/types.js");
 //
 //  Copyright 2021 Readium Foundation. All rights reserved.
 //  Use of this source code is governed by the BSD-style license
@@ -4095,10 +4173,504 @@ __webpack_require__.r(__webpack_exports__);
 
 // Base script used by both reflowable and fixed layout resources.
 
+    let userReactionsAccessibleArray = [];
+    
+function initializeAccessibility(doubleTapLabel, energyBarLabel) {
+    let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, b, figcaption, code, li, dt, td, title, image, img")).filter((el) => el.innerText && el.innerText.trim() != "")
+    textElements.forEach((el) => {
+        var text = el.innerText.trim()
+        if (doubleTapLabel) {
+            text += `, ${doubleTapLabel}`
+        }
+        if (energyBarLabel) {
+            text += `, ${energyBarLabel}`
+        }
+        
+        el.setAttribute("role", "button")
+        el.setAttribute("aria-label", text)
+    })
+}
 
+    function setAccessibility(enabled) {
+        let enabledValue = (enabled === "true");
+        let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, b, figcaption, code, li, dt, td, title, image, img, div"))
+        textElements.forEach((el) => {
+            el.setAttribute("aria-hidden", !enabledValue)
+        })
+    }
 
+    function elementIsWithinRect(superRect, el) {
+        let frame = el.getBoundingClientRect()
+        if (frame.height === 0) { return false }
+        let isFullyContained = superRect.y < frame.y && superRect.y + superRect.height > frame.y + frame.height
+        let isContaining = superRect.y > frame.y && superRect.y + superRect.height < frame.y + frame.height
+        return isFullyContained || isContaining
+    }
 
+    // Assigns an Aria-Label to the element. If there is already aria label there, then it will update or add the one
+    function updateArialLabel(element, ariaLabel) {
+      var text = element.innerText.trim()
+      const currentArialLabel = element.getAttribute("aria-label")
+      if (currentArialLabel) {
+          let foundAriaLabel = currentArialLabel.includes(ariaLabel)
+          if (!foundAriaLabel) {
+              text = `${ariaLabel}` + currentArialLabel
+          } else {
+              text = currentArialLabel
+          }
+      } else {
+          text = `${ariaLabel}` + text
+      }
 
+      element.setAttribute("role", "button")
+      element.setAttribute("aria-label", text)
+    }
+
+    // Removes an Aria-Label from the element
+    function removeArialLabel(element, ariaLabel) {
+      var text = element.innerText.trim()
+      const currentArialLabel = element.getAttribute("aria-label")
+      if (currentArialLabel) {
+          let foundAriaLabel = currentArialLabel.includes(ariaLabel)
+          if (foundAriaLabel) {
+              text = currentArialLabel.replace(`${ariaLabel}`,'')
+          } else {
+              text = currentArialLabel
+          }
+
+          element.setAttribute("aria-label", text)
+      }
+    }
+
+    function rectanglesIntersect(rectangle1, rectangle2) {
+      const x1 = rectangle1.x;
+      const y1 = rectangle1.y;
+      const width1 = rectangle1.width;
+      const height1 = rectangle1.height;
+
+      const x2 = rectangle2.x;
+      const y2 = rectangle2.y;
+      const width2 = rectangle2.width;
+      const height2 = rectangle2.height;
+
+      // Check for intersection
+      if (
+        x1 < x2 + width2 &&
+        x1 + width1 > x2 &&
+        y1 < y2 + height2 &&
+        y1 + height1 > y2
+      ) {
+        return true;
+      } else {
+        return false;
+      }
+    }
+    
+    function elementWithLocatorIsWithinRect(superRect, el) {
+        let frame = el.getBoundingClientRect()
+        if (frame.height === 0) { return false }
+        
+        let elementRect = {
+            x: frame.x,
+            y: frame.y,
+            width: frame.width,
+            height: frame.height
+        }
+        
+        let padding = 5
+        let locatorRect = {
+            x: superRect.x - padding,
+            y: superRect.y - padding,
+            width: superRect.width - padding,
+            height: superRect.height - padding
+        }
+
+        let resultIntersect = rectanglesIntersect(elementRect, locatorRect)
+        return resultIntersect
+    }
+
+    function textElementList() {
+        let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, b, figcaption, code, li, dt, td, title, image, img")).filter((el) => el.innerText && el.innerText.trim() != "");
+        return textElements
+    }
+    
+    // Adds aria attributes when Shared annotations are present, by using a locator that will be sent from the native code
+    function addAccessibilityEnergyBar(locators, sharedAnnotationsLabel) {
+        let textElements = textElementList()
+        
+        for (let i = 0; i < locators.length ; i++) {
+            try {
+                let locator = locators[i]
+                let foundRect = rectFromLocatorText(locator)
+                if (!foundRect) {
+                    console.log("addAccessibilityEnergyBar - > foundRect not found");
+                    continue;
+                }
+                
+                const href = readium.link.href;
+                if (href == locator.href) {
+                    let containingTextElements = textElements.filter((el) => elementWithLocatorIsWithinRect(foundRect, el))
+                    containingTextElements.forEach((el) => {
+                        updateArialLabel(el, sharedAnnotationsLabel)
+                    })
+                }
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        return true
+    }
+    
+    // Removes all the aria attributes when Shared annotations are disabled
+    function removeAccessibilityEnergyBar(sharedAnnotationsLabel) {
+        let textElements = textElementList()
+        textElements.forEach((el) => {
+            removeArialLabel(el, sharedAnnotationsLabel)
+        })
+
+        return true
+    }
+    
+    // Remove all current accessible labels
+    function removeCurrentAccessibility() {
+        for (let i = 0; i < userReactionsAccessibleArray.length; i++) {
+          const elementAccessible = userReactionsAccessibleArray[i];
+            removeArialLabel(elementAccessible.element, elementAccessible.label)
+        }
+        
+        userReactionsAccessibleArray = [];
+    }
+    
+    // Adds aria attributes when user annotations are present, by using a locator that will be sent from the native code
+    function addAccessibilityUserAnnotation(locators, labels) {
+        removeCurrentAccessibility()
+        let textElements = textElementList()
+        for (let i = 0; i < locators.length ; i++) {
+            try {
+                let locator = locators[i]
+                let userAnnotationLabel = labels[i]
+                let foundRect = rectFromLocatorText(locator)
+                if (!foundRect) {
+                    console.log("addAccessibilityUserAnnotation - > foundRect not found");
+                    continue;
+                }
+                
+                const href = readium.link.href;
+                if (href == locator.href) {
+                    let containingTextElements = textElements.filter((el) => elementWithLocatorIsWithinRect(foundRect, el))
+                    containingTextElements.forEach((el) => {
+                        const elementAccessible = { element: el, label: userAnnotationLabel}
+                        userReactionsAccessibleArray.push(elementAccessible);
+                        updateArialLabel(el, userAnnotationLabel)
+                    })
+                }
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        return true
+    }
+    
+function initializeIntersectionObserver() {
+    const callback = (elements, observer) => {
+        var intersectingRects = []
+        elements.forEach((entry) => {
+            if (entry.target.innerText && entry.target.innerText != "") {
+                let intersectionRect = toNativeRect(entry.intersectionRect)
+                intersectingRects.push({
+                    x: intersectionRect.left,
+                    y: intersectionRect.top,
+                    width: intersectionRect.width,
+                    height: intersectionRect.height,
+                    innerHTML: entry.target.innerText,
+                    intersectionRatio: entry.intersectionRatio
+                })
+            }
+        })
+        
+        webkit.messageHandlers.visibleRects.postMessage({
+            rects: intersectingRects
+        })
+    }
+    
+    let options = {
+        threshold: buildIntersectionBreakpoints(10)
+    }
+    
+    let observer = new IntersectionObserver(callback, options)
+    
+    const textNodes = Array.from(document.querySelectorAll("p, h1, h2, h3, strong, figcaption, code, li, dt, td, title, div"))
+    
+    textNodes.forEach((node) => observer.observe(node))
+}
+    
+function buildIntersectionBreakpoints(numSteps) {
+    var steps = [0.0]
+    for (let i = 1.0; i < numSteps.length; i++) {
+        steps.push(i / numSteps)
+    }
+    steps.push(1.0)
+    return steps
+}
+    
+function toNativeRect(rect) {
+  let point = adjustPointToViewport({ x: rect.left, y: rect.top });
+
+  const width = rect.width;
+  const height = rect.height;
+  const left = point.x;
+  const top = point.y;
+  const right = left + width;
+  const bottom = top + height;
+  return { width, height, left, top, right, bottom };
+}
+    
+/**
+ * Checks webview to see if scrolled to end of scrollable content
+ */
+function updateEndOfSpread() {
+    let reachedEndOfSpread = window.scrollY + window.innerHeight >= document.scrollingElement.scrollHeight
+    webkit.messageHandlers.reachedEndOfSpread.postMessage(reachedEndOfSpread)
+}
+
+/**
+ * Adjusts the given coordinates to the viewport for FXL resources.
+ */
+function adjustPointToViewport(point) {
+  if (!frameElement) {
+    return point;
+  }
+  let frameRect = frameElement.getBoundingClientRect();
+  if (!frameRect) {
+    return point;
+  }
+
+  let topScrollingElement = window.top.document.documentElement;
+  return {
+    x: point.x + frameRect.x + topScrollingElement.scrollLeft,
+    y: point.y + frameRect.y + topScrollingElement.scrollTop,
+  };
+}
+
+function rectsFromTexts(texts) {
+    return texts.map((text) => {
+        let cleanHighlight = text.text.trim()
+            .replace(/\n/g, " ")
+            .replace(/\s\s+/g, " ");
+        let range = _utils__WEBPACK_IMPORTED_MODULE_1__.rangeFromLocator({
+            text: {
+                highlight: cleanHighlight
+            }
+        })
+        if (!range || range.collapsed) {
+            return undefined
+        }
+        let rect = toNativeRect(range.getBoundingClientRect())
+        if (rect.bottom < 0 || rect.top > window.innerHeight) {
+            return undefined
+        }
+        return {
+            x: rect.left,
+            y: rect.top,
+            width: rect.width,
+            height: rect.height,
+            innerHTML: text.text,
+            intersectionRatio: text.intersectionRatio
+        }
+    }).filter((rect) => rect)
+}
+    
+function rectFromPoint(point) {
+    let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, b, figcaption, code, li, dt, td, title, div")).filter((el) => el.innerText && el.innerText.trim() != "")
+    const containsPoint = (el) => {
+        let frame = el.getBoundingClientRect()
+        if (frame.height === 0) { return false }
+        if (frame.x < point.x && frame.x + frame.width > point.x && frame.y < point.y && frame.y + frame.height > point.y) {
+            return true
+        }
+        return false
+    }
+    
+    let containingTextElements = textElements.filter((el) => containsPoint(el))
+    let smallestContainingTextElement = containingTextElements.reduce((prev, current) => prev.height < current.height ? prev : current)
+    if (!smallestContainingTextElement) {
+        return
+    }
+    let elementFrame = smallestContainingTextElement.getBoundingClientRect()
+    return {
+        x: elementFrame.x,
+        y: elementFrame.y,
+        width: elementFrame.width,
+        height: elementFrame.height
+    }
+}
+    
+function textFromRect(rect) {
+    let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, b, figcaption, code, li, dt, td, title, div")).filter((el) => el.innerText && el.innerText.trim() != "")
+    const containsRect = (superRect, el) => {
+        let frame = el.getBoundingClientRect()
+        if (frame.height === 0) { return false }
+        let isFullyContained = superRect.y <= frame.y && superRect.y + superRect.height >= frame.y + frame.height
+        let isOverlappingAbove = superRect.y >= frame.y && frame.y + frame.height>= superRect.y && frame.y + frame.height <= superRect.y + superRect.height
+        let isOverlappingBelow = superRect.y <= frame.y && frame.y <= superRect.y + superRect.height && frame.y + frame.height >= superRect.y + superRect.height
+        let isContaining = superRect.y >= frame.y && superRect.y + superRect.height <= frame.y + frame.height
+        return isFullyContained || isOverlappingBelow || isOverlappingAbove || isContaining
+    }
+    
+    const isRectUnique = (el) => {
+        let rect = el.getBoundingClientRect()
+        let otherRects = containingTextElements.map((_el) => _el.getBoundingClientRect()).filter((_rect) => {
+            return _rect.y != rect.y || _rect.height != rect.height
+        })
+        for (var i = 0; i < otherRects.length; i++) {
+            let otherRect = otherRects[i]
+            if (otherRect.y >= rect.y && (rect.y + rect.height) >= (otherRect.y + otherRect.height)) {
+                return false
+            }
+        }
+        return true
+    }
+    
+    let containingTextElements = textElements.filter((el) => containsRect(rect, el))
+    var texts = containingTextElements.filter((el) => isRectUnique(el)).map((el) => {
+        return el.textContent
+    })
+    var text = ""
+    for (var i = 0; i < texts.length; i++) {
+        text = text + (i === 0 ? "" : "\n")+ texts[i]
+    }
+    text = text.trim().replace(/\n/g, " ").replace(/\s\s+/g, " ")
+    var anchor = undefined
+    var range = undefined
+    try {
+        anchor = new _vendor_hypothesis_anchoring_types__WEBPACK_IMPORTED_MODULE_0__.TextQuoteAnchor(document.body, text)
+        range = anchor.toRange()
+    } catch {
+        return text
+    }
+    const shouldContinueTrimmingAbove = (range) => {
+        if (!range || range.collapsed) {
+            return false
+        }
+        let boundingRect = range.getBoundingClientRect()
+        return boundingRect.y < rect.y
+    }
+    const shouldContinueTrimmingBelow = (range) => {
+        if (!range || range.collapsed) {
+            return false
+        }
+        let boundingRect = range.getBoundingClientRect()
+        return boundingRect.y + boundingRect.height > rect.y + rect.height
+    }
+    while (shouldContinueTrimmingAbove(range)) {
+        let nextWordIndex = text.indexOf(" ")
+        if (!nextWordIndex || nextWordIndex === -1) {
+            break
+        }
+        text = text.slice(nextWordIndex + 1)
+        var newRange = undefined
+        try {
+            anchor = new _vendor_hypothesis_anchoring_types__WEBPACK_IMPORTED_MODULE_0__.TextQuoteAnchor(document.body, text)
+            newRange = anchor.toRange()
+        } catch {
+            continue
+        }
+        if (!newRange || newRange.collapsed) continue
+        range = newRange
+    }
+    
+    while (shouldContinueTrimmingBelow(range)) {
+        let nextWordIndex = text.lastIndexOf(" ")
+        if (!nextWordIndex || nextWordIndex === -1) {
+            break
+        }
+        text = text.slice(0, nextWordIndex)
+        var newRange = undefined
+        try {
+            anchor = new _vendor_hypothesis_anchoring_types__WEBPACK_IMPORTED_MODULE_0__.TextQuoteAnchor(document.body, text)
+            newRange = anchor.toRange()
+        } catch {
+            continue
+        }
+        if (!newRange || newRange.collapsed) continue
+        range = newRange
+    }
+    let boundingRect = range.getBoundingClientRect();
+    let isContaining = boundingRect.y >= rect.y && boundingRect.y + boundingRect.height <= rect.y + rect.height;
+    return isContaining ? text : "";
+}
+    
+function rectsFromLocatorText(locators) {
+    let rects = locators.map((locator) => {
+        return rectFromLocatorText(locator)
+    })
+    return rects.filter((rect) => rect)
+}
+    
+function rectFromLocatorText(locator) {
+    let range = _utils__WEBPACK_IMPORTED_MODULE_1__.rangeFromLocator(locator)
+    if (!range) {
+        return undefined
+    }
+    let rect = toNativeRect(range.getBoundingClientRect())
+    return {
+        x: rect.left,
+        y: rect.top,
+        width: rect.width,
+        height: rect.height
+    }
+}
+    
+function locatorFromRect(rect) {
+    let text = textFromRect(rect);
+    let locator = selectionText(text);
+    return locator;
+}
+    
+function selectionText(totalText) {
+    const cleanHighlight = totalText.trim()
+        .replace(/\n/g, " ")
+        .replace(/\s\s+/g, " ");
+    if (cleanHighlight.length === 0) {
+      return undefined;
+    }
+    
+    const documentText = document.body.textContent
+    
+    let range = _utils__WEBPACK_IMPORTED_MODULE_1__.rangeFromLocator({
+        text: {
+            highlight: cleanHighlight
+        }
+    })
+    if (!range) {
+      return undefined
+    }
+    
+    const textRange =  _vendor_hypothesis_anchoring_text_range__WEBPACK_IMPORTED_MODULE_2__.TextRange.fromRange(range).relativeTo(document.body);
+
+    const start = textRange.start.offset;
+    const end = textRange.end.offset;
+
+    const snippetLength = 200;
+
+    // Compute the text before the highlight, ignoring the first "word", which might be cut.
+    let before = documentText.slice(Math.max(0, start - snippetLength), start);
+    let firstWordStart = before.search(/\P{L}\p{L}/gu);
+    if (firstWordStart !== -1) {
+      before = before.slice(firstWordStart + 1);
+    }
+
+    // Compute the text after the highlight, ignoring the last "word", which might be cut.
+    let after = documentText.slice(end, Math.min(documentText.length, end + snippetLength));
+    let lastWordEnd = Array.from(after.matchAll(/\p{L}\P{L}/gu)).pop();
+    if (lastWordEnd !== undefined && lastWordEnd.index > 1) {
+      after = after.slice(0, lastWordEnd.index + 1);
+    }
+    const actualHighlight = documentText.slice(start,end);
+    return { highlight: actualHighlight, before, after };
+}
 // Public API used by the navigator.
 window.readium = {
   // utils
@@ -4113,6 +4685,21 @@ window.readium = {
   // decoration
   registerDecorationTemplates: _decorator__WEBPACK_IMPORTED_MODULE_2__.registerTemplates,
   getDecorations: _decorator__WEBPACK_IMPORTED_MODULE_2__.getDecorations,
+  initializeIntersectionObserver: initializeIntersectionObserver,
+  initializeAccessibility: initializeAccessibility,
+setAccessibility: setAccessibility,
+  rectsFromTexts: rectsFromTexts,
+  textFromRect: textFromRect,
+  rectFromPoint: rectFromPoint,
+  selectionText: selectionText,
+  rectFromLocatorText: rectFromLocatorText,
+  rectsFromLocatorText: rectsFromLocatorText,
+  updateEndOfSpread: updateEndOfSpread,
+  locatorFromRect: locatorFromRect,
+  addAccessibilityEnergyBar: addAccessibilityEnergyBar,
+  addAccessibilityUserAnnotation: addAccessibilityUserAnnotation,
+  removeAccessibilityEnergyBar: removeAccessibilityEnergyBar,
+  activateDecoration: _decorator__WEBPACK_IMPORTED_MODULE_2__.activateDecoration
 };
 
 
@@ -4589,8 +5176,8 @@ function getCurrentSelectionText() {
   if (lastWordEnd !== undefined && lastWordEnd.index > 1) {
     after = after.slice(0, lastWordEnd.index + 1);
   }
-
-  return { highlight, before, after };
+  const actualHighlight = text.slice(start,end);
+  return { highlight: actualHighlight, before, after };
 }
 
 function createOrderedRange(startNode, startOffset, endNode, endOffset) {
@@ -4770,7 +5357,9 @@ function appendVirtualColumnIfNeeded() {
   const id = "readium-virtual-page";
   var virtualCol = document.getElementById(id);
   if (isScrollModeEnabled() || getColumnCountPerScreen() != 2) {
-    virtualCol?.remove();
+    if (virtualCol) {
+      virtualCol.remove();
+    }
   } else {
     var documentWidth = document.scrollingElement.scrollWidth;
     var pageWidth = window.innerWidth;
@@ -4800,6 +5389,12 @@ function update(position) {
   var positionString = position.toString();
   webkit.messageHandlers.progressionChanged.postMessage(positionString);
 }
+    
+function updateOffset(offset) {
+    webkit.messageHandlers.offsetChanged.postMessage(offset)
+    let reachedEndOfSpread = window.scrollY + window.innerHeight >= document.scrollingElement.scrollHeight
+    webkit.messageHandlers.reachedEndOfSpread.postMessage(reachedEndOfSpread)
+}
 
 window.addEventListener("scroll", function () {
   last_known_scrollY_position =
@@ -4824,6 +5419,7 @@ window.addEventListener("scroll", function () {
           ? last_known_scrollY_position
           : last_known_scrollX_position
       );
+      updateOffset(isScrollModeEnabled() ? window.scrollY : window.scrollX)
       ticking = false;
     });
   }
@@ -5272,7 +5868,7 @@ function resolveOffsets(element, ...offsets) {
   let nextOffset = offsets.shift();
   const nodeIter = /** @type {Document} */ (
     element.ownerDocument
-  ).createNodeIterator(element, NodeFilter.SHOW_TEXT);
+  ).createNodeIterator(element, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_CDATA_SECTION);
   const results = [];
 
   let currentNode = nodeIter.nextNode();
@@ -8012,7 +8608,7 @@ module.exports = function sign(number) {
 /************************************************************************/
 /******/ 	// The module cache
 /******/ 	var __webpack_module_cache__ = {};
-/******/ 	
+/******/
 /******/ 	// The require function
 /******/ 	function __webpack_require__(moduleId) {
 /******/ 		// Check if module is in cache
@@ -8026,14 +8622,14 @@ module.exports = function sign(number) {
 /******/ 			// no module.loaded needed
 /******/ 			exports: {}
 /******/ 		};
-/******/ 	
+/******/
 /******/ 		// Execute the module function
 /******/ 		__webpack_modules__[moduleId](module, module.exports, __webpack_require__);
-/******/ 	
+/******/
 /******/ 		// Return the exports of the module
 /******/ 		return module.exports;
 /******/ 	}
-/******/ 	
+/******/
 /************************************************************************/
 /******/ 	/* webpack/runtime/compat get default export */
 /******/ 	(() => {
@@ -8046,7 +8642,7 @@ module.exports = function sign(number) {
 /******/ 			return getter;
 /******/ 		};
 /******/ 	})();
-/******/ 	
+/******/
 /******/ 	/* webpack/runtime/define property getters */
 /******/ 	(() => {
 /******/ 		// define getter functions for harmony exports
@@ -8058,12 +8654,12 @@ module.exports = function sign(number) {
 /******/ 			}
 /******/ 		};
 /******/ 	})();
-/******/ 	
+/******/
 /******/ 	/* webpack/runtime/hasOwnProperty shorthand */
 /******/ 	(() => {
 /******/ 		__webpack_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))
 /******/ 	})();
-/******/ 	
+/******/
 /******/ 	/* webpack/runtime/make namespace object */
 /******/ 	(() => {
 /******/ 		// define __esModule on exports
@@ -8074,7 +8670,7 @@ module.exports = function sign(number) {
 /******/ 			Object.defineProperty(exports, '__esModule', { value: true });
 /******/ 		};
 /******/ 	})();
-/******/ 	
+/******/
 /************************************************************************/
 var __webpack_exports__ = {};
 // This entry need to be wrapped in an IIFE because it need to be in strict mode.
