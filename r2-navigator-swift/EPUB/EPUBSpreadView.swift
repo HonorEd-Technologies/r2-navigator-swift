@@ -234,6 +234,18 @@ class EPUBSpreadView: UIView, Loggable, PageView {
         return rect
     }
 
+    /// Converts to JavaScript point from a point in the webview's coordinate space.
+    func convertPointFromNavigatorSpace(_ point: CGPoint) -> CGPoint {
+        // To override in subclasses.
+        return point
+    }
+
+    /// Converts to JavaScript rect from a rect in the webview's coordinate space.
+    func convertRectFromNavigatorSpace(_ rect: CGRect) -> CGRect {
+        // To override in subclasses.
+        return rect
+    }
+
     /// Called by the UITapGestureRecognizer as a fallback tap when tapping around the webview.
     @objc private func didTapBackground(_ gesture: UITapGestureRecognizer) {
         let point = gesture.location(in: self)
