@@ -141,6 +141,12 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
         }
     }
     
+    public var isCurrentSpreadFixedLayout: Bool {
+        get {
+            return (paginationView.currentView as? EPUBSpreadView)?.spread.layout == .fixed
+        }
+    }
+    
     public var contentSizeHeight: CGFloat? {
         paginationView.currentViewContentHeight
     }
@@ -723,6 +729,18 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
     }
 
     // MARK: – EPUB-specific extensions
+    public func convertRectToNavigatorSpace(_ rect: CGRect) -> CGRect {
+        guard let spreadView = paginationView.currentView as? EPUBSpreadView else {
+            return rect
+        }
+        return spreadView.convertRectToNavigatorSpace(rect)
+    }
+    public func convertRectFromNavigatorSpace(_ rect: CGRect) -> CGRect {
+        guard let spreadView = paginationView.currentView as? EPUBSpreadView else {
+            return rect
+        }
+        return spreadView.convertRectFromNavigatorSpace(rect)
+    }
 
     /// Evaluates the given JavaScript on the currently visible HTML resource.
     public func evaluateJavaScript(_ script: String, completion: ((Result<Any, Error>) -> Void)? = nil) {

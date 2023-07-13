@@ -4622,11 +4622,171 @@ function rectFromLocatorText(locator) {
         height: rect.height
     }
 }
+function findCommonAncestor(node1, node2) {
+    function findPath(node) {
+        if (node == document.body) {
+            return [node];
+        }
+        let path = findPath(node.parentElement);
+        path.push(node);
+        return path;
+    }
+    let path1 = findPath(node1);
+    let path2 = findPath(node2);
+    let commonAncestor = document.body;
+    for (let index = 0; index < path1.length && index < path2.length; ++index) {
+        if (path1[index] != path2[index]) {
+            break;
+        }
+        commonAncestor = path1[index];
+    }
+    return commonAncestor;
+}
+function getTextNodesBetween(startNode, endNode) {
+    let pastStartNode = false;
+    let reachedEndNode = false;
+    let textNodes = [];
+
+    function getTextNodes(node) {
+      let val = node.nodeValue;
+
+      if (node == startNode) {
+        pastStartNode = true;
+      }
+      if (node.nodeType == 3) {
+        if (val && pastStartNode && !reachedEndNode && !/^\s*$/.test(val)) {
+          textNodes.push(node);
+        }
+      }
+      for (var i = 0, len = node.childNodes.length; !reachedEndNode && i < len; ++i) {
+        getTextNodes(node.childNodes[i]);
+      }
+      if (node == endNode) {
+        reachedEndNode = true;
+      }
+    }
+    getTextNodes(findCommonAncestor(startNode, endNode));
+    return textNodes;
+}
     
 function locatorFromRect(rect) {
-    let text = textFromRect(rect);
-    let locator = selectionText(text);
-    return locator;
+    let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, b, figcaption, code, li, dt, td, title, div")).filter((el) => el.innerText && el.innerText.trim() != "")
+    const containsRect = (superRect, el) => {
+        let frame = el.getBoundingClientRect()
+        if (frame.height === 0) { return false }
+        let isFullyContained = superRect.y <= frame.y && superRect.y + superRect.height >= frame.y + frame.height
+        let isOverlappingAbove = superRect.y >= frame.y && frame.y + frame.height>= superRect.y && frame.y + frame.height <= superRect.y + superRect.height
+        let isOverlappingBelow = superRect.y <= frame.y && frame.y <= superRect.y + superRect.height && frame.y + frame.height >= superRect.y + superRect.height
+        let isContaining = superRect.y >= frame.y && superRect.y + superRect.height <= frame.y + frame.height
+        return isFullyContained || isOverlappingBelow || isOverlappingAbove || isContaining
+    }
+    
+    const isRectUnique = (el) => {
+        let rect = el.getBoundingClientRect()
+        let otherRects = containingTextElements.map((_el) => _el.getBoundingClientRect()).filter((_rect) => {
+            return _rect.y != rect.y || _rect.height != rect.height
+        })
+        for (var i = 0; i < otherRects.length; i++) {
+            let otherRect = otherRects[i]
+            if (otherRect.y >= rect.y && (rect.y + rect.height) >= (otherRect.y + otherRect.height)) {
+                return false
+            }
+        }
+        return true
+    }
+    
+    let containingTextElements = textElements.filter((el) => containsRect(rect, el))
+    var textsElements = containingTextElements.filter((el) => isRectUnique(el)).map((el) => {
+        return el
+    })
+    if (textsElements.length == 0) {
+        return undefined;
+    }
+    
+    let textNodesInRange = getTextNodesBetween(textsElements[0], textsElements[textsElements.length-1]);
+    const shouldContinueTrimmingAbove = (rnge) => {
+        if (!rnge || rnge.collapsed) {
+            return false
+        }
+        let boundingRect = rnge.getBoundingClientRect()
+        return boundingRect.y < rect.y
+    }
+    const shouldContinueTrimmingBelow = (rnge) => {
+        if (!rnge || rnge.collapsed) {
+            return false
+        }
+        let boundingRect = rnge.getBoundingClientRect()
+        return boundingRect.y + boundingRect.height > rect.y + rect.height
+    }
+    let startTextNodeIndex = 0;
+    let nextWordIndex = 0;
+
+    let range = document.createRange();
+
+    range.setStart(textNodesInRange[0], 0);
+    range.setEnd(textNodesInRange[textNodesInRange.length - 1], textNodesInRange[textNodesInRange.length - 1].length-1);
+
+    while (shouldContinueTrimmingAbove(range)) {
+        nextWordIndex = textNodesInRange[startTextNodeIndex].textContent.indexOf(" ", nextWordIndex + 1);
+        if (nextWordIndex === -1) {
+            nextWordIndex = 0;
+            startTextNodeIndex += 1;
+
+            if (startTextNodeIndex === textNodesInRange.length) {
+                return undefined;
+            }
+       }
+        try {
+            var newRange = range.setStart(textNodesInRange[startTextNodeIndex], nextWordIndex);
+        } catch {
+            continue;
+        }
+        if (!newRange || newRange.collapsed) continue;
+        range = newRange
+    }
+    let endTextNodeIndex = textNodesInRange.length - 1;
+    nextWordIndex = textNodesInRange[endTextNodeIndex].textContent.length;
+    while (shouldContinueTrimmingBelow(range)) {
+        nextWordIndex = textNodesInRange[endTextNodeIndex].textContent.lastIndexOf(" ", nextWordIndex - 1);
+        if (nextWordIndex <= 0) {
+            endTextNodeIndex -= 1;
+            nextWordIndex = textNodesInRange[endTextNodeIndex].length;
+            if (endTextNodeIndex < startTextNodeIndex) {
+                return undefined;
+            }
+        }
+        try {
+            var newRange = range.setEnd(textNodesInRange[endTextNodeIndex], nextWordIndex);
+        } catch {
+            continue;
+        }
+        if (!newRange || newRange.collapsed) continue;
+        range = newRange
+    }
+
+    if (!range || range.toString().length === 0) {
+      return undefined
+    }
+    const textRange =  _vendor_hypothesis_anchoring_text_range__WEBPACK_IMPORTED_MODULE_2__.TextRange.fromRange(range).relativeTo(document.body);
+    const start = textRange.start.offset;
+    const end = textRange.end.offset;
+    const snippetLength = 200;
+    const documentText = document.body.textContent
+    // Compute the text before the highlight, ignoring the first "word", which might be cut.
+    let before = documentText.slice(Math.max(0, start - snippetLength), start);
+    let firstWordStart = before.search(/\P{L}\p{L}/gu);
+    if (firstWordStart !== -1) {
+      before = before.slice(firstWordStart + 1);
+    }
+
+    // Compute the text after the highlight, ignoring the last "word", which might be cut.
+    let after = documentText.slice(end, Math.min(documentText.length, end + snippetLength));
+    let lastWordEnd = Array.from(after.matchAll(/\p{L}\P{L}/gu)).pop();
+    if (lastWordEnd !== undefined && lastWordEnd.index > 1) {
+      after = after.slice(0, lastWordEnd.index + 1);
+    }
+
+    return { highlight: range.toString(), before, after };
 }
     
 function selectionText(totalText) {

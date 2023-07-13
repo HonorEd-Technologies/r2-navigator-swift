@@ -151,6 +151,33 @@ final class EPUBReflowableSpreadView: EPUBSpreadView {
         return rect
     }
 
+    override func convertPointFromNavigatorSpace(_ point: CGPoint) -> CGPoint {
+        var point = point
+        if isScrollEnabled {
+            // Starting from iOS 12, the contentInset are not taken into account in the JS touch event.
+            if #available(iOS 12.0, *) {
+                if scrollView.contentOffset.x < 0 {
+                    point.x -= abs(scrollView.contentOffset.x)
+                }
+                if scrollView.contentOffset.y < 0 {
+                    point.y -= abs(scrollView.contentOffset.y)
+                }
+            } else {
+                point.x -= scrollView.contentInset.left
+                point.y -= scrollView.contentInset.top
+            }
+        }
+        point.x -= webView.frame.minX
+        point.y -= webView.frame.minY
+        return point
+    }
+
+    override func convertRectFromNavigatorSpace(_ rect: CGRect) -> CGRect {
+        var rect = rect
+        rect.origin = convertPointFromNavigatorSpace(rect.origin)
+        return rect
+    }
+
     /// MARK: - Location and progression
     
     override func progression(in href: String) -> Double {

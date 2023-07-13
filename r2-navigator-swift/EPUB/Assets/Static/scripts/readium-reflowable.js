@@ -4622,11 +4622,27 @@ function rectFromLocatorText(locator) {
         height: rect.height
     }
 }
-    
-function getTextNodesBetween(range) {
-    let rootNode = range.commonAncestorContainer;
-    let startNode = range.startContainer;
-    let endNode = range.endContainer;
+function findCommonAncestor(node1, node2) {
+    function findPath(node) {
+        if (node == document.body) {
+            return [node];
+        }
+        let path = findPath(node.parentElement);
+        path.push(node);
+        return path;
+    }
+    let path1 = findPath(node1);
+    let path2 = findPath(node2);
+    let commonAncestor = document.body;
+    for (let index = 0; index < path1.length && index < path2.length; ++index) {
+        if (path1[index] != path2[index]) {
+            break;
+        }
+        commonAncestor = path1[index];
+    }
+    return commonAncestor;
+}
+function getTextNodesBetween(startNode, endNode) {
     let pastStartNode = false;
     let reachedEndNode = false;
     let textNodes = [];
@@ -4649,19 +4665,45 @@ function getTextNodesBetween(range) {
         reachedEndNode = true;
       }
     }
-    getTextNodes(rootNode);
+    getTextNodes(findCommonAncestor(startNode, endNode));
     return textNodes;
 }
     
 function locatorFromRect(rect) {
-    let startPointRange = document.caretRangeFromPoint(rect.x, rect.y);
-    let endPointRange = document.caretRangeFromPoint(rect.x, rect.y + rect.height);
-    let range = document.createRange();
-
-    range.setStart(startPointRange.startContainer, startPointRange.startOffset);
-    range.setEnd(endPointRange.startContainer, endPointRange.startOffset);
+    let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, b, figcaption, code, li, dt, td, title, div")).filter((el) => el.innerText && el.innerText.trim() != "")
+    const containsRect = (superRect, el) => {
+        let frame = el.getBoundingClientRect()
+        if (frame.height === 0) { return false }
+        let isFullyContained = superRect.y <= frame.y && superRect.y + superRect.height >= frame.y + frame.height
+        let isOverlappingAbove = superRect.y >= frame.y && frame.y + frame.height>= superRect.y && frame.y + frame.height <= superRect.y + superRect.height
+        let isOverlappingBelow = superRect.y <= frame.y && frame.y <= superRect.y + superRect.height && frame.y + frame.height >= superRect.y + superRect.height
+        let isContaining = superRect.y >= frame.y && superRect.y + superRect.height <= frame.y + frame.height
+        return isFullyContained || isOverlappingBelow || isOverlappingAbove || isContaining
+    }
     
-    let textNodesInRange = getTextNodesBetween(range);
+    const isRectUnique = (el) => {
+        let rect = el.getBoundingClientRect()
+        let otherRects = containingTextElements.map((_el) => _el.getBoundingClientRect()).filter((_rect) => {
+            return _rect.y != rect.y || _rect.height != rect.height
+        })
+        for (var i = 0; i < otherRects.length; i++) {
+            let otherRect = otherRects[i]
+            if (otherRect.y >= rect.y && (rect.y + rect.height) >= (otherRect.y + otherRect.height)) {
+                return false
+            }
+        }
+        return true
+    }
+    
+    let containingTextElements = textElements.filter((el) => containsRect(rect, el))
+    var textsElements = containingTextElements.filter((el) => isRectUnique(el)).map((el) => {
+        return el
+    })
+    if (textsElements.length == 0) {
+        return undefined;
+    }
+    
+    let textNodesInRange = getTextNodesBetween(textsElements[0], textsElements[textsElements.length-1]);
     const shouldContinueTrimmingAbove = (rnge) => {
         if (!rnge || rnge.collapsed) {
             return false
@@ -4678,7 +4720,12 @@ function locatorFromRect(rect) {
     }
     let startTextNodeIndex = 0;
     let nextWordIndex = 0;
-    
+
+    let range = document.createRange();
+
+    range.setStart(textNodesInRange[0], 0);
+    range.setEnd(textNodesInRange[textNodesInRange.length - 1], textNodesInRange[textNodesInRange.length - 1].length-1);
+
     while (shouldContinueTrimmingAbove(range)) {
         nextWordIndex = textNodesInRange[startTextNodeIndex].textContent.indexOf(" ", nextWordIndex + 1);
         if (nextWordIndex === -1) {
@@ -4701,9 +4748,9 @@ function locatorFromRect(rect) {
     nextWordIndex = textNodesInRange[endTextNodeIndex].textContent.length;
     while (shouldContinueTrimmingBelow(range)) {
         nextWordIndex = textNodesInRange[endTextNodeIndex].textContent.lastIndexOf(" ", nextWordIndex - 1);
-        if (nextWordIndex === -1) {
+        if (nextWordIndex <= 0) {
             endTextNodeIndex -= 1;
-            nextWordIndex = textNodesInRange[endTextNodeIndex].length;;
+            nextWordIndex = textNodesInRange[endTextNodeIndex].length;
             if (endTextNodeIndex < startTextNodeIndex) {
                 return undefined;
             }
