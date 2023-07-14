@@ -4673,14 +4673,15 @@ function locatorFromRect(rect) {
     let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, b, figcaption, code, li, dt, td, title, div")).filter((el) => el.innerText && el.innerText.trim() != "")
     const containsRect = (superRect, el) => {
         let frame = el.getBoundingClientRect()
+        
         if (frame.height === 0) { return false }
-        let isFullyContained = superRect.y <= frame.y && superRect.y + superRect.height >= frame.y + frame.height
-        let isOverlappingAbove = superRect.y >= frame.y && frame.y + frame.height>= superRect.y && frame.y + frame.height <= superRect.y + superRect.height
-        let isOverlappingBelow = superRect.y <= frame.y && frame.y <= superRect.y + superRect.height && frame.y + frame.height >= superRect.y + superRect.height
-        let isContaining = superRect.y >= frame.y && superRect.y + superRect.height <= frame.y + frame.height
-        return isFullyContained || isOverlappingBelow || isOverlappingAbove || isContaining
+        const maxLeft = Math.max(frame.x, superRect.x);
+        const minRight = Math.min(frame.right, superRect.x + superRect.width);
+        const maxTop = Math.max(frame.y, superRect.y);
+        const minBottom = Math.min(frame.bottom, superRect.y + superRect.height);
+
+        return ((minRight - maxLeft) > 0 && (minBottom - maxTop) > 0)
     }
-    
     const isRectUnique = (el) => {
         let rect = el.getBoundingClientRect()
         let otherRects = containingTextElements.map((_el) => _el.getBoundingClientRect()).filter((_rect) => {
