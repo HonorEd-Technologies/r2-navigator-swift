@@ -4669,7 +4669,7 @@ function getTextNodesBetween(startNode, endNode) {
     return textNodes;
 }
     
-function locatorFromRect(rect) {
+function locatorFromRect(rect, hrefIds) {
     let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, b, figcaption, code, li, dt, td, title, div")).filter((el) => el.innerText && el.innerText.trim() != "")
     const containsRect = (superRect, el) => {
         let frame = el.getBoundingClientRect()
@@ -4786,8 +4786,18 @@ function locatorFromRect(rect) {
     if (lastWordEnd !== undefined && lastWordEnd.index > 1) {
       after = after.slice(0, lastWordEnd.index + 1);
     }
+    const startSubChapterId = findMatchingId(hrefIds, range.startContainer);
+    const endSubChapterId = findMatchingId(hrefIds, range.endContainer);
 
-    return { highlight: range.toString(), before, after };
+    return { highlight: range.toString(), before, after, startSubChapterId, endSubChapterId};
+}
+
+function findMatchingId(hrefIds, element) {
+    if (!hrefIds || hrefIds.length === 0) return "";
+    while (element != document.body && !hrefIds.includes(element.id)) {
+        element = element.previousSibling ? element.previousSibling : element.parentElement;
+    }
+    return element == document.body ? "" : element.id;
 }
     
 function selectionText(totalText) {
