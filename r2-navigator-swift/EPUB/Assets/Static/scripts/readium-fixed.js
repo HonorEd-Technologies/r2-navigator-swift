@@ -4672,12 +4672,12 @@ function getTextNodesBetween(startNode, endNode) {
 function locatorFromRect(rect, hrefIds) {
     let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, b, figcaption, code, li, dt, td, title, div")).filter((el) => el.innerText && el.innerText.trim() != "")
     const containsRect = (superRect, el) => {
-        let frame = el.getBoundingClientRect()
+        let frame = toNativeRect(el.getBoundingClientRect())
         
         if (frame.height === 0) { return false }
-        const maxLeft = Math.max(frame.x, superRect.x);
+        const maxLeft = Math.max(frame.left, superRect.x);
         const minRight = Math.min(frame.right, superRect.x + superRect.width);
-        const maxTop = Math.max(frame.y, superRect.y);
+        const maxTop = Math.max(frame.top, superRect.y);
         const minBottom = Math.min(frame.bottom, superRect.y + superRect.height);
 
         return ((minRight - maxLeft) > 0 && (minBottom - maxTop) > 0)
