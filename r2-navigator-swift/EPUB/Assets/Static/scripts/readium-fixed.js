@@ -4793,13 +4793,17 @@ function locatorFromRect(rect, hrefIds) {
 }
 
 function findMatchingId(hrefIds, element) {
+    function getLastElement(ele) {
+        return ele.lastElementChild ? getLastElement(ele.lastElementChild) : ele;
+    }
+
     if (!hrefIds || hrefIds.length === 0) return "";
     while (element != document.body && !hrefIds.includes(element.id)) {
-        element = element.previousSibling ? element.previousSibling : element.parentElement;
+        element = element.previousElementSibling ? getLastElement(element.previousElementSibling) : element.parentElement;
     }
     return element == document.body ? "" : element.id;
 }
-    
+
 function selectionText(totalText) {
     const cleanHighlight = totalText.trim()
         .replace(/\n/g, " ")
