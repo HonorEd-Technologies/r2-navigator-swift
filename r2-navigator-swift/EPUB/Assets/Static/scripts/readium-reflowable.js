@@ -4669,15 +4669,15 @@ function getTextNodesBetween(startNode, endNode) {
     return textNodes;
 }
     
-function locatorFromRect(rect) {
+function locatorFromRect(rect, hrefIds) {
     let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, b, figcaption, code, li, dt, td, title, div")).filter((el) => el.innerText && el.innerText.trim() != "")
     const containsRect = (superRect, el) => {
-        let frame = el.getBoundingClientRect()
+        let frame = toNativeRect(el.getBoundingClientRect())
         
         if (frame.height === 0) { return false }
-        const maxLeft = Math.max(frame.x, superRect.x);
+        const maxLeft = Math.max(frame.left, superRect.x);
         const minRight = Math.min(frame.right, superRect.x + superRect.width);
-        const maxTop = Math.max(frame.y, superRect.y);
+        const maxTop = Math.max(frame.top, superRect.y);
         const minBottom = Math.min(frame.bottom, superRect.y + superRect.height);
 
         return ((minRight - maxLeft) > 0 && (minBottom - maxTop) > 0)
@@ -4709,15 +4709,15 @@ function locatorFromRect(rect) {
         if (!rnge || rnge.collapsed) {
             return false
         }
-        let boundingRect = rnge.getBoundingClientRect()
-        return boundingRect.y < rect.y
+        let boundingRect = toNativeRect(rnge.getBoundingClientRect())
+        return boundingRect.top < rect.y
     }
     const shouldContinueTrimmingBelow = (rnge) => {
         if (!rnge || rnge.collapsed) {
             return false
         }
-        let boundingRect = rnge.getBoundingClientRect()
-        return boundingRect.y + boundingRect.height > rect.y + rect.height
+        let boundingRect = toNativeRect(rnge.getBoundingClientRect())
+        return boundingRect.bottom > rect.y + rect.height
     }
     let startTextNodeIndex = 0;
     let nextWordIndex = 0;
@@ -4786,10 +4786,24 @@ function locatorFromRect(rect) {
     if (lastWordEnd !== undefined && lastWordEnd.index > 1) {
       after = after.slice(0, lastWordEnd.index + 1);
     }
+    const startSubChapterId = findMatchingId(hrefIds, range.startContainer);
+    const endSubChapterId = findMatchingId(hrefIds, range.endContainer);
 
-    return { highlight: range.toString(), before, after };
+    return { highlight: range.toString(), before, after, startSubChapterId, endSubChapterId};
 }
-    
+
+function findMatchingId(hrefIds, element) {
+    function getLastElement(ele) {
+        return ele.lastElementChild ? getLastElement(ele.lastElementChild) : ele;
+    }
+
+    if (!hrefIds || hrefIds.length === 0) return "";
+    while (element != document.body && !hrefIds.includes(element.id)) {
+        element = element.previousElementSibling ? getLastElement(element.previousElementSibling) : element.parentElement;
+    }
+    return element == document.body ? "" : element.id;
+}
+
 function selectionText(totalText) {
     const cleanHighlight = totalText.trim()
         .replace(/\n/g, " ")
