@@ -4709,15 +4709,15 @@ function locatorFromRect(rect, hrefIds) {
         if (!rnge || rnge.collapsed) {
             return false
         }
-        let boundingRect = rnge.getBoundingClientRect()
-        return boundingRect.y < rect.y
+        let boundingRect = toNativeRect(rnge.getBoundingClientRect())
+        return boundingRect.top < rect.y
     }
     const shouldContinueTrimmingBelow = (rnge) => {
         if (!rnge || rnge.collapsed) {
             return false
         }
-        let boundingRect = rnge.getBoundingClientRect()
-        return boundingRect.y + boundingRect.height > rect.y + rect.height
+        let boundingRect = toNativeRect(rnge.getBoundingClientRect())
+        return boundingRect.bottom > rect.y + rect.height
     }
     let startTextNodeIndex = 0;
     let nextWordIndex = 0;
