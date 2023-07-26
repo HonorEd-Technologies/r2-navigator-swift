@@ -4745,6 +4745,10 @@ function locatorFromRect(rect, hrefIds) {
         if (!newRange || newRange.collapsed) continue;
         range = newRange
     }
+    const boundingRect = toNativeRect(range.getBoundingClientRect())
+    if (boundingRect.top >= rect.y + rect.height) {
+        return undefined
+    }
     let endTextNodeIndex = textNodesInRange.length - 1;
     nextWordIndex = textNodesInRange[endTextNodeIndex].textContent.length;
     while (shouldContinueTrimmingBelow(range)) {
