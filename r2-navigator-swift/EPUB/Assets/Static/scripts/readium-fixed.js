@@ -3686,28 +3686,16 @@ function getDecorations(groupName) {
   return group;
 }
 
-    function groupExistsInTargets(group, targets) {
-        for (var i = 0; i < targets.length; i++) {
-            let target = targets[i];
-            if (target.group == group) {
-                return true;
-            }
+function groupExistsInTargets(group, targets) {
+    for (var i = 0; i < targets.length; i++) {
+        let target = targets[i];
+        if (target.group == group) {
+            return true;
         }
-        
-        return false;
     }
-    
-    
-    function groupExistsInTargets(group, targets) {
-        for (var i = 0; i < targets.length; i++) {
-            let target = targets[i];
-            if (target.group == group) {
-                return true;
-            }
-        }
 
-        return false;
-    }
+    return false;
+}
     
 /**
  * Handles click events on a Decoration.
@@ -4104,9 +4092,7 @@ function onClick(event) {
     // by the WKNavigationDelegate if needed.
     webkit.messageHandlers.tap.postMessage(clickEvent);
 
-  if ((0,_decorator__WEBPACK_IMPORTED_MODULE_0__.handleDecorationClickEvent)(event, clickEvent)) {
-    // NO OP
-  }
+(0,_decorator__WEBPACK_IMPORTED_MODULE_0__.handleDecorationClickEvent)(event, clickEvent);
 
   // We don't want to disable the default WebView behavior as it breaks some features without bringing any value.
   // event.stopPropagation();
@@ -4174,7 +4160,7 @@ __webpack_require__.r(__webpack_exports__);
 // Base script used by both reflowable and fixed layout resources.
 
     let userReactionsAccessibleArray = [];
-    
+const textElementTags = "p, h1, h2, h3, b, figcaption, code, li, dt, td, title, div";
 function initializeAccessibility(doubleTapLabel, energyBarLabel) {
     let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, b, figcaption, code, li, dt, td, title, image, img")).filter((el) => el.innerText && el.innerText.trim() != "")
     textElements.forEach((el) => {
@@ -4483,7 +4469,7 @@ function rectsFromTexts(texts) {
 }
     
 function rectFromPoint(point) {
-    let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, b, figcaption, code, li, dt, td, title, div")).filter((el) => el.innerText && el.innerText.trim() != "")
+    let textElements = Array.from(document.querySelectorAll(textElementTags)).filter((el) => el.innerText && el.innerText.trim() != "")
     const containsPoint = (el) => {
         let frame = el.getBoundingClientRect()
         if (frame.height === 0) { return false }
@@ -4508,7 +4494,7 @@ function rectFromPoint(point) {
 }
     
 function textFromRect(rect) {
-    let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, b, figcaption, code, li, dt, td, title, div")).filter((el) => el.innerText && el.innerText.trim() != "")
+    let textElements = Array.from(document.querySelectorAll(textElementTags)).filter((el) => el.innerText && el.innerText.trim() != "")
     const containsRect = (superRect, el) => {
         let frame = el.getBoundingClientRect()
         if (frame.height === 0) { return false }
@@ -4670,7 +4656,7 @@ function getTextNodesBetween(startNode, endNode) {
 }
     
 function locatorFromRect(rect, hrefIds) {
-    let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, b, figcaption, code, li, dt, td, title, div")).filter((el) => el.innerText && el.innerText.trim() != "")
+    let textElements = Array.from(document.querySelectorAll(textElementTags)).filter((el) => el.innerText && el.innerText.trim() != "")
     const containsRect = (superRect, el) => {
         let frame = toNativeRect(el.getBoundingClientRect())
         
@@ -4705,70 +4691,85 @@ function locatorFromRect(rect, hrefIds) {
     }
     
     let textNodesInRange = getTextNodesBetween(textsElements[0], textsElements[textsElements.length-1]);
-    const shouldContinueTrimmingAbove = (rnge) => {
-        if (!rnge || rnge.collapsed) {
-            return false
-        }
-        let boundingRect = toNativeRect(rnge.getBoundingClientRect())
-        return boundingRect.top < rect.y
-    }
-    const shouldContinueTrimmingBelow = (rnge) => {
-        if (!rnge || rnge.collapsed) {
-            return false
-        }
-        let boundingRect = toNativeRect(rnge.getBoundingClientRect())
-        return boundingRect.bottom > rect.y + rect.height
-    }
-    let startTextNodeIndex = 0;
-    let nextWordIndex = 0;
-
     let range = document.createRange();
 
     range.setStart(textNodesInRange[0], 0);
     range.setEnd(textNodesInRange[textNodesInRange.length - 1], textNodesInRange[textNodesInRange.length - 1].length-1);
+    const trimmingAboveResult = trimRangeAbove(range, textNodesInRange, rect);
+    range = trimmingAboveResult.range
+    range = trimRangeBelow(range, textNodesInRange, rect, trimmingAboveResult.startTextNodeIndex);
+    return rangeToLocator(range, hrefIds);
+}
 
-    while (shouldContinueTrimmingAbove(range)) {
-        nextWordIndex = textNodesInRange[startTextNodeIndex].textContent.indexOf(" ", nextWordIndex + 1);
-        if (nextWordIndex === -1) {
-            nextWordIndex = 0;
-            startTextNodeIndex += 1;
+function trimRangeAbove(range, textNodesInRange, rect) {
+  const shouldContinueTrimmingAbove = (rnge) => {
+    if (!rnge || rnge.collapsed) {
+        return false
+    }
+    let boundingRect = toNativeRect(rnge.getBoundingClientRect())
+    return boundingRect.top < rect.y
+  }
+  let startTextNodeIndex = 0;
+  let nextWordIndex = 0;
+  while (shouldContinueTrimmingAbove(range)) {
+    nextWordIndex = textNodesInRange[startTextNodeIndex].textContent.indexOf(" ", nextWordIndex + 1);
+    if (nextWordIndex === -1) {
+        nextWordIndex = 0;
+        startTextNodeIndex += 1;
 
-            if (startTextNodeIndex === textNodesInRange.length) {
-                return undefined;
-            }
-       }
-        try {
-            var newRange = range.setStart(textNodesInRange[startTextNodeIndex], nextWordIndex);
-        } catch {
-            continue;
+        if (startTextNodeIndex === textNodesInRange.length) {
+            return {startTextNodeIndex};
         }
-        if (!newRange || newRange.collapsed) continue;
-        range = newRange
+   }
+    try {
+        var newRange = range.setStart(textNodesInRange[startTextNodeIndex], nextWordIndex);
+    } catch {
+        continue;
     }
-    const boundingRect = toNativeRect(range.getBoundingClientRect())
-    if (boundingRect.top >= rect.y + rect.height) {
-        return undefined
-    }
-    let endTextNodeIndex = textNodesInRange.length - 1;
-    nextWordIndex = textNodesInRange[endTextNodeIndex].textContent.length;
-    while (shouldContinueTrimmingBelow(range)) {
-        nextWordIndex = textNodesInRange[endTextNodeIndex].textContent.lastIndexOf(" ", nextWordIndex - 1);
-        if (nextWordIndex <= 0) {
-            endTextNodeIndex -= 1;
-            nextWordIndex = textNodesInRange[endTextNodeIndex].length;
-            if (endTextNodeIndex < startTextNodeIndex) {
-                return undefined;
-            }
-        }
-        try {
-            var newRange = range.setEnd(textNodesInRange[endTextNodeIndex], nextWordIndex);
-        } catch {
-            continue;
-        }
-        if (!newRange || newRange.collapsed) continue;
-        range = newRange
-    }
+    if (!newRange || newRange.collapsed) continue;
+    range = newRange
+  }
+  const boundingRect = toNativeRect(range.getBoundingClientRect())
+  if (boundingRect.top >= rect.y + rect.height) {
+      return {startTextNodeIndex}
+  }
 
+  return {range, startTextNodeIndex}
+}
+function trimRangeBelow(range, textNodesInRange, rect, startTextNodeIndex) {
+  if (!range || range.toString().length === 0) {
+    return undefined
+  }
+  const shouldContinueTrimmingBelow = (rnge) => {
+    if (!rnge || rnge.collapsed) {
+        return false
+    }
+    let boundingRect = toNativeRect(rnge.getBoundingClientRect())
+    return boundingRect.bottom > rect.y + rect.height
+  }
+  let endTextNodeIndex = textNodesInRange.length - 1;
+  let nextWordIndex = textNodesInRange[endTextNodeIndex].textContent.length;
+  while (shouldContinueTrimmingBelow(range)) {
+      nextWordIndex = textNodesInRange[endTextNodeIndex].textContent.lastIndexOf(" ", nextWordIndex - 1);
+      if (nextWordIndex <= 0) {
+          endTextNodeIndex -= 1;
+          nextWordIndex = textNodesInRange[endTextNodeIndex].length;
+          if (endTextNodeIndex < startTextNodeIndex) {
+              return undefined;
+          }
+      }
+      try {
+          var newRange = range.setEnd(textNodesInRange[endTextNodeIndex], nextWordIndex);
+      } catch {
+          continue;
+      }
+      if (!newRange || newRange.collapsed) continue;
+      range = newRange
+  }
+  return range
+}
+
+function rangeToLocator(range, hrefIds) {
     if (!range || range.toString().length === 0) {
       return undefined
     }
