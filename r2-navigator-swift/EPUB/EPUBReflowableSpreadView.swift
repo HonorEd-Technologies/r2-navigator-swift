@@ -127,17 +127,11 @@ final class EPUBReflowableSpreadView: EPUBSpreadView {
     override func convertPointToNavigatorSpace(_ point: CGPoint) -> CGPoint {
         var point = point
         if isScrollEnabled {
-            // Starting from iOS 12, the contentInset are not taken into account in the JS touch event.
-            if #available(iOS 12.0, *) {
-                if scrollView.contentOffset.x < 0 {
-                    point.x += abs(scrollView.contentOffset.x)
-                }
-                if scrollView.contentOffset.y < 0 {
-                    point.y += abs(scrollView.contentOffset.y)
-                }
-            } else {
-                point.x += scrollView.contentInset.left
-                point.y += scrollView.contentInset.top
+            if scrollView.contentOffset.x < 0 {
+                point.x += abs(scrollView.contentOffset.x)
+            }
+            if scrollView.contentOffset.y < 0 {
+                point.y += abs(scrollView.contentOffset.y)
             }
         }
         point.x += webView.frame.minX
@@ -154,17 +148,11 @@ final class EPUBReflowableSpreadView: EPUBSpreadView {
     override func convertPointFromNavigatorSpace(_ point: CGPoint) -> CGPoint {
         var point = point
         if isScrollEnabled {
-            // Starting from iOS 12, the contentInset are not taken into account in the JS touch event.
-            if #available(iOS 12.0, *) {
-                if scrollView.contentOffset.x < 0 {
-                    point.x -= abs(scrollView.contentOffset.x)
-                }
-                if scrollView.contentOffset.y < 0 {
-                    point.y -= abs(scrollView.contentOffset.y)
-                }
-            } else {
-                point.x -= scrollView.contentInset.left
-                point.y -= scrollView.contentInset.top
+            if scrollView.contentOffset.x < 0 {
+                point.x -= abs(scrollView.contentOffset.x)
+            }
+            if scrollView.contentOffset.y < 0 {
+                point.y -= abs(scrollView.contentOffset.y)
             }
         }
         point.x -= webView.frame.minX
