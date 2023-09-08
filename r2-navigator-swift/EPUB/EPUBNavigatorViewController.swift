@@ -115,6 +115,10 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
         didSet { notifyCurrentLocation() }
     }
     
+    public var currentWebView: UIView? {
+        return (paginationView.currentView as? EPUBSpreadView)?.webView
+    }
+    
     public var onSelection: ((_ selection: Selection) -> Void)?
     public var onSelectionWithScrollSize: ((_ selection: Selection, _ scrollSize: CGSize) -> Void)?
     public var isAllowingSelection = true
