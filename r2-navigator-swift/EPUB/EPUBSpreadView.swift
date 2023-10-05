@@ -105,15 +105,14 @@ class EPUBSpreadView: UIView, Loggable, PageView {
             webView.configuration.userContentController.addUserScript(script)
         }
         registerJSMessages()
-
-        NotificationCenter.default.addObserver(self, selector: #selector(voiceOverStatusDidChange), name: Notification.Name(UIAccessibilityVoiceOverStatusChanged), object: nil)
+        registerNotifications()
 
         updateActivityIndicator()
         loadSpread()
     }
 
     deinit {
-        NotificationCenter.default.removeObserver(self)
+        unregisterNotifications()
         disableJSMessages()
     }
 
@@ -371,7 +370,7 @@ class EPUBSpreadView: UIView, Loggable, PageView {
     }
     
     /// Add the message handlers for incoming javascript events.
-    private func enableJSMessages() {
+    func enableJSMessages() {
         guard !JSMessagesEnabled else {
             return
         }
@@ -382,7 +381,7 @@ class EPUBSpreadView: UIView, Loggable, PageView {
     }
     
     // Removes message handlers (preventing strong reference cycle).
-    private func disableJSMessages() {
+    func disableJSMessages() {
         guard JSMessagesEnabled else {
             return
         }
@@ -391,8 +390,20 @@ class EPUBSpreadView: UIView, Loggable, PageView {
             webView.configuration.userContentController.removeScriptMessageHandler(forName: name)
         }
     }
+    private var voiceOverStatusChangeObserver: NSObjectProtocol?
 
-
+    func registerNotifications() {
+        if voiceOverStatusChangeObserver == nil {
+            voiceOverStatusChangeObserver = NotificationCenter.default.addObserver(forName: Notification.Name(UIAccessibilityVoiceOverStatusChanged),
+                        object: nil, queue: nil) { [weak self] notification in
+                self?.voiceOverStatusDidChange()
+            }
+        }
+    }
+    func unregisterNotifications() {
+        NotificationCenter.default.removeObserver(voiceOverStatusChangeObserver)
+        voiceOverStatusChangeObserver = nil
+    }
     // MARK: – Decorator
 
     /// Called by the JavaScript layer when the user activates a decoration.

@@ -28,6 +28,8 @@ public protocol EPUBNavigatorDelegate: VisualNavigatorDelegate, SelectableNaviga
 
     /// Implement `NavigatorDelegate.navigator(presentError:)` instead.
     func presentError(_ error: NavigatorError)
+    
+    func handleTapOnTrimmedInternalLink(link: String)
 
 }
 
@@ -40,7 +42,7 @@ public extension EPUBNavigatorDelegate {
     func didChangedDocumentPage(currentDocumentIndex: Int) {}
     func didNavigateViaInternalLinkTap(to documentIndex: Int) {}
     func presentError(_ error: NavigatorError) {}
-
+    func handleTapOnTrimmedInternalLink(link: String) {}
 }
 
 
@@ -113,6 +115,10 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
 
     public weak var delegate: EPUBNavigatorDelegate? {
         didSet { notifyCurrentLocation() }
+    }
+    
+    public var currentWebView: UIView? {
+        return (paginationView.currentView as? EPUBSpreadView)?.webView
     }
     
     public var onSelection: ((_ selection: Selection) -> Void)?
@@ -319,6 +325,15 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
         delegate?.navigator(self, didTapAt: point)
     }
 
+    open override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        
+        paginationView.loadedViews.values.forEach {
+            ($0 as? EPUBSpreadView)?.enableJSMessages()
+            ($0 as? EPUBSpreadView)?.registerNotifications()
+        }
+    }
+    
     open override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         
@@ -326,6 +341,11 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
         if let currentResourceIndex = currentResourceIndex {
             let progression = currentLocation?.locations.progression
             delegate?.willExitPublication(documentIndex: currentResourceIndex, progression: progression)
+        }
+        
+        paginationView.loadedViews.values.forEach {
+            ($0 as? EPUBSpreadView)?.disableJSMessages()
+            ($0 as? EPUBSpreadView)?.unregisterNotifications()
         }
     }
     
@@ -558,9 +578,7 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
         
         let link = spreadView.focusedResource ?? spreadView.spread.leading
         let href = link.href
-        // There are some cases when the progression might come as a negative value, in order to avoid the app to crash we set the value to 0
-        var progression = spreadView.progression(in: href)
-        progression = progression > 0 ? progression : 0
+        var progression = min(max(spreadView.progression(in: href), 0.0), 1.0)
         
         // The positions are not always available, for example a Readium WebPub doesn't have any
         // unless a Publication Positions Web Service is provided.
@@ -656,10 +674,9 @@ open class EPUBNavigatorViewController: UIViewController, VisualNavigator, Selec
         }
     }
     
-    /// if true user can select text otherwise not
+    // if true user can select text otherwise not
     private var isTextSelectionEnabled = true
-    /// set the  property `isTextSelectionEnabled`
-    /// update the text selection for the loaded views
+    // set the  property `isTextSelectionEnabled`
     public func setTextSelection(allow: Bool = true) {
         for (_, pageView) in paginationView.loadedViews {
             (pageView as? EPUBSpreadView)?.webView.configuration.preferences.isTextInteractionEnabled = allow
@@ -924,7 +941,12 @@ extension EPUBNavigatorViewController: EPUBSpreadViewDelegate {
             }
         }
             
-        go(to: Link(href: href))
+        if let trimmedToc = config.trimmedToc, !trimmedToc.contains(where: { $0.href == href }) {
+            self.delegate?.handleTapOnTrimmedInternalLink(link: href)
+        } else {
+            go(to: Link(href: href))
+        }
+        
     }
     
     /// Checks if the internal link is a noteref, and retrieves both the referring text of the link and the body of the note.
@@ -1135,7 +1157,7 @@ extension EPUBNavigatorViewController: PaginationViewDelegate {
     func paginationView(_ paginationView: PaginationView, pageViewAtIndex index: Int) -> (UIView & PageView)? {
         let spread = spreads[index]
         if let trimmedToc = config.trimmedToc, !trimmedToc.isEmpty {
-            let pageNumbers = trimmedToc.map(\.href).map(trimEpubHrefComments).compactMap({ self.spreads.firstIndex(withHref: $0) })
+            let pageNumbers = trimmedToc.map(\.href).map(trimEpubHrefComments).compactMap({ [weak self] in self?.spreads.firstIndex(withHref: $0) })
             paginationView.pageNumbers = pageNumbers
         }
         
@@ -1163,8 +1185,12 @@ extension EPUBNavigatorViewController: PaginationViewDelegate {
             spreadView.webView.configuration.preferences.isTextInteractionEnabled = !config.editingActions.isEmpty && isTextSelectionEnabled
         }
         
-        spreadView.registerJSMessage(named: "offsetChanged", handler: handleOffsetChanged)
-        spreadView.registerJSMessage(named: "reachedEndOfSpread", handler: handleEndOfSpread)
+        spreadView.registerJSMessage(named: "offsetChanged", handler: { [weak self] in
+            self?.handleOffsetChanged(val: $0)
+        })
+        spreadView.registerJSMessage(named: "reachedEndOfSpread", handler: { [weak self] in
+            self?.handleEndOfSpread(val: $0)
+        })
 
         return spreadView
     }
