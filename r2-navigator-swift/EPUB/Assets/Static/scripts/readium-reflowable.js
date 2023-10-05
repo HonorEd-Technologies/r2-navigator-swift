@@ -3920,7 +3920,7 @@ function DecorationGroup(groupId, groupName) {
         element.style.width = `${pageWidth}px`;
         element.style.height = `${rect.height}px`;
         let left = Math.floor(rect.left / pageWidth) * pageWidth;
-        element.style.left = `${left + xOffset}px`;
+        element.style.left = `${left}px`;
         element.style.top = `${rect.top + yOffset}px`;
       }
     }
@@ -4160,9 +4160,10 @@ __webpack_require__.r(__webpack_exports__);
 // Base script used by both reflowable and fixed layout resources.
 
     let userReactionsAccessibleArray = [];
-const textElementTags = "p, h1, h2, h3, b, figcaption, code, li, dt, td, title, div";
+const textElementTags = "p, h1, h2, h3, b, figcaption, code, li, dt, td, title, div, span, strong, em, i";
+const accessibiltyTags = textElementTags.concat(", image, img")
 function initializeAccessibility(doubleTapLabel, energyBarLabel) {
-    let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, b, figcaption, code, li, dt, td, title, image, img")).filter((el) => el.innerText && el.innerText.trim() != "")
+    let textElements = Array.from(document.querySelectorAll(accessibiltyTags)).filter((el) => el.innerText && el.innerText.trim() != "")
     textElements.forEach((el) => {
         var text = el.innerText.trim()
         if (doubleTapLabel) {
@@ -4179,7 +4180,7 @@ function initializeAccessibility(doubleTapLabel, energyBarLabel) {
 
     function setAccessibility(enabled) {
         let enabledValue = (enabled === "true");
-        let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, b, figcaption, code, li, dt, td, title, image, img, div"))
+        let textElements = Array.from(document.querySelectorAll(accessibiltyTags))
         textElements.forEach((el) => {
             el.setAttribute("aria-hidden", !enabledValue)
         })
@@ -4276,7 +4277,7 @@ function initializeAccessibility(doubleTapLabel, energyBarLabel) {
     }
 
     function textElementList() {
-        let textElements = Array.from(document.querySelectorAll("p, h1, h2, h3, b, figcaption, code, li, dt, td, title, image, img")).filter((el) => el.innerText && el.innerText.trim() != "");
+        let textElements = Array.from(document.querySelectorAll(accessibiltyTags)).filter((el) => el.innerText && el.innerText.trim() != "");
         return textElements
     }
     
@@ -4387,7 +4388,7 @@ function initializeIntersectionObserver() {
     
     let observer = new IntersectionObserver(callback, options)
     
-    const textNodes = Array.from(document.querySelectorAll("p, h1, h2, h3, strong, figcaption, code, li, dt, td, title, div"))
+    const textNodes = Array.from(document.querySelectorAll(textElementTags))
     
     textNodes.forEach((node) => observer.observe(node))
 }
@@ -4598,7 +4599,7 @@ function rectsFromLocatorText(locators) {
 function rectFromLocatorText(locator) {
     let range = _utils__WEBPACK_IMPORTED_MODULE_1__.rangeFromLocator(locator)
     if (!range) {
-        return undefined
+        return { x: 0, y: 0, width: 0, height: 0 }
     }
     let rect = toNativeRect(range.getBoundingClientRect())
     return {
@@ -4661,10 +4662,11 @@ function locatorFromRect(rect, hrefIds) {
         let frame = toNativeRect(el.getBoundingClientRect())
         
         if (frame.height === 0) { return false }
+        let lineHeight = parseFloat(getComputedStyle(el).getPropertyValue("line-height"))
         const maxLeft = Math.max(frame.left, superRect.x);
         const minRight = Math.min(frame.right, superRect.x + superRect.width);
-        const maxTop = Math.max(frame.top, superRect.y);
-        const minBottom = Math.min(frame.bottom, superRect.y + superRect.height);
+        const maxTop = Math.max(frame.top + lineHeight / 2, superRect.y);
+        const minBottom = Math.min(frame.bottom - lineHeight / 2, superRect.y + superRect.height);
 
         return ((minRight - maxLeft) > 0 && (minBottom - maxTop) > 0)
     }
@@ -4707,7 +4709,9 @@ function trimRangeAbove(range, textNodesInRange, rect) {
         return false
     }
     let boundingRect = toNativeRect(rnge.getBoundingClientRect())
-    return boundingRect.top < rect.y
+    let lineHeight = parseFloat(getComputedStyle(rnge.startContainer.parentElement).getPropertyValue("line-height"))
+
+    return (boundingRect.top + (lineHeight / 2)) < rect.y
   }
   let startTextNodeIndex = 0;
   let nextWordIndex = 0;
@@ -4744,8 +4748,11 @@ function trimRangeBelow(range, textNodesInRange, rect, startTextNodeIndex) {
     if (!rnge || rnge.collapsed) {
         return false
     }
+      
     let boundingRect = toNativeRect(rnge.getBoundingClientRect())
-    return boundingRect.bottom > rect.y + rect.height
+    let lineHeight = parseFloat(getComputedStyle(rnge.startContainer.parentElement).getPropertyValue("line-height"))
+
+    return (boundingRect.bottom - (lineHeight / 2)) > rect.y + rect.height
   }
   let endTextNodeIndex = textNodesInRange.length - 1;
   let nextWordIndex = textNodesInRange[endTextNodeIndex].textContent.length;
@@ -6299,6 +6306,20 @@ class TextRange {
 
     const range = new Range();
     range.setStart(start.node, start.offset);
+    // start and end refer to the starting and ending elements (and their offsets) of the
+    // locator's highlight within the document. What this check is doing is making sure
+    // that the end position isn't the very beginning of an element, and if it is,
+    // we should move to the very end of the previous element. Linked Issue HSA-2051
+    if (start != end && end.offset === 0) {
+        const tw = document.createTreeWalker(end.node.getRootNode(), NodeFilter.SHOW_TEXT);
+        tw.currentNode = end.node;
+        const text = tw.previousNode();
+
+        if (text) {
+            end.node = text;
+            end.offset = text.data.length;
+        }
+    }
     range.setEnd(end.node, end.offset);
     return range;
   }

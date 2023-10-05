@@ -145,6 +145,16 @@ final class PaginationView: UIView, Loggable {
         fatalError("init(coder:) has not been implemented")
     }
     
+    private func numberOfChapters() -> Int {
+        let minPage = pageNumbers?.first ?? 0
+        let maxPage = pageNumbers?.last ?? pageCount
+        var totalPages = maxPage - minPage + 1
+        if let pageNumbers = pageNumbers {
+            totalPages = Array(Set(pageNumbers)).count
+        }
+        return totalPages
+    }
+    
     public override func layoutSubviews() {
         guard !loadedViews.isEmpty else {
             scrollView.contentSize = bounds.size
@@ -269,7 +279,11 @@ final class PaginationView: UIView, Loggable {
            let view = delegate?.paginationView(self, pageViewAtIndex: index)
         {
             loadedViews[index] = view
-            scrollView.addSubview(view)
+            if numberOfChapters() == 1 {
+                addSubview(view)
+            } else {
+                scrollView.addSubview(view)
+            }
             setNeedsLayout()
         }
 
@@ -278,9 +292,9 @@ final class PaginationView: UIView, Loggable {
             return
         }
 
-        view.go(to: location) {
+        view.go(to: location) { [weak self] in
             completion()
-            self.loadNextPage()
+            self?.loadNextPage()
         }
     }
 
